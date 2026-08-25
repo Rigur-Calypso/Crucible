@@ -68,12 +68,19 @@ Implemented cases in `networkPolicy.test.ts` (✓ = passing today):
 link-local · ✓ IPv6 · ✓ malformed · ✓ alternate encodings · ✓ disallowed port · ✓ hostname
 resolving out-of-arena · ✓ split-result (any address out) · ✓ unresolvable (fail closed) · ✓
 resolver error (fail closed).
+**Layer 1 — proven on the real network.** `../arena/verify-arena.sh` brings up the arena and
+asserts, against the running Docker network, that the arena network is `internal` and that a
+container attached to it **cannot reach the public internet** (`example.com` fails DNS,
+`8.8.8.8:443` fails to connect) while web-01 is still reachable by hostname and the exploit
+returns the flag. This is the network-level containment counterpart to the in-code Layer-2 tests.
+All 7 checks pass today. The remaining `[verify in impl]` is confirming the **TrueForge sandbox**
+attaches to (only) this same internal network so it inherits the containment.
+
 **Partly covered:** a `fetch_file` path-traversal rejection is asserted at the MCP layer in
 `server.test.ts`; the exhaustive traversal matrix (encoded separators, absolute paths, symlink
 escape) is still to add against `fetchFile.ts` directly.
 **Still to add (impl):** DNS-rebinding time-of-check/use at the `connect` socket; the exhaustive
-`fetch_file` traversal matrix and symlink-escape check; unauthorized challenge access; and a
-**Layer 1** test proving sandbox code cannot reach a non-arena destination.
+`fetch_file` traversal matrix and symlink-escape check; and unauthorized-challenge-access tests.
 
 ## 7. Secrets
 No keys/tokens/passwords/credentials/`.env`/personal data in the repo, ever. `.env.example` +

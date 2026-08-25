@@ -183,3 +183,46 @@ sandbox and resolve the `[verify in impl]` items.
 - `connect` enforces the allowlist but does not yet open a real proxied socket to the sandbox
   (Layer-1 sandbox egress lockdown + the socket hand-off remain `[verify in impl]`).
 - Arena not yet exercised through `docker compose` (daemon was down); only the web-01 app itself.
+
+---
+
+## 2026-08-26 (later) — Pushed to GitHub + arena verified on real Docker
+
+### Objective
+Get the foundation onto the team's GitHub repo through the reviewed-PR workflow (not a direct
+push to main), and — now that the Docker daemon is up — verify the arena end-to-end on the real
+network, including Layer-1 containment.
+
+### Actions
+- Restructured history: `main` seeded with a minimal baseline ("Initialize repository", .gitignore
+  only) so PR #1's diff is the whole foundation; all work on `feature/project-foundation`.
+- Added remote `origin` → github.com/Rigur-Calypso/Crucible; pushed `main` and
+  `feature/project-foundation` (auth via osxkeychain; secret-scan clean; node_modules excluded).
+- Brought up the arena via `docker compose`; confirmed web-01 at 10.42.0.5, network `internal:true`,
+  subnet 10.42.0.0/24, no host port published.
+- Added `arena/verify-arena.sh` and ran it: **7/7 checks pass** — reachability by hostname,
+  /challenge.json, control-creds rejection, SQLi auth bypass returns the flag, and **Layer-1
+  egress to example.com and 8.8.8.8 is blocked** from a container on the arena network.
+- Updated README quickstart (one-command arena check) and SECURITY_MODEL §6 (Layer-1 now proven
+  on the real network; remaining item is confirming the TrueForge sandbox attaches to this net).
+
+### Decisions
+- Establish `main` as a near-empty baseline and land the foundation via PR #1, keeping the graded
+  review trail intact and honoring "never push work directly to main."
+
+### Verification
+- `git ls-remote origin` succeeds; both branches present on origin.
+- `bash arena/verify-arena.sh`: 7/7 pass. web-01 exploit reproduced on the compose network.
+- Layer-1: curl to example.com exits 6 (DNS fail), to 8.8.8.8 exits 7 (connect fail) → contained.
+
+### Qodo review
+Ready to run once Qodo is installed on the repo and PR #1 is opened from
+`feature/project-foundation` (link below). Suggested review focus unchanged: networkPolicy.ts,
+fetchFile.ts, index.ts result/error shaping, arena network isolation.
+
+### Current status
+Code is on GitHub. Open PR #1:
+https://github.com/Rigur-Calypso/Crucible/pull/new/feature/project-foundation
+Arena verified on real Docker with Layer-1 containment proven. Next (needs the running harness):
+`npx @truefoundry/trueforge`, add the MCP connector, mark `connect` approval-required, wire its
+socket hand-off through the sandbox, and confirm the sandbox attaches only to the arena network.

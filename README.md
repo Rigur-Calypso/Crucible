@@ -45,8 +45,17 @@ _Prereqs (Node, Docker), then the five steps below._
 ### Running the arena
 ```
 # stand up the self-owned, intentionally vulnerable targets
-docker compose -f arena/docker-compose.yml up
+docker compose -f arena/docker-compose.yml up -d
+
+# one-command health + containment check (reachability, exploit, Layer-1 egress blocked)
+bash arena/verify-arena.sh
+
+# tear down when done
+docker compose -f arena/docker-compose.yml down
 ```
+`verify-arena.sh` proves, on the real Docker network, that web-01 is reachable and solvable and
+that a container on the arena network has **no egress to the public internet** (Layer 1). See
+`docs/SECURITY_MODEL.md` §6.
 
 ### Running the MCP server
 _TODO: build/run steps for `mcp-server/`._

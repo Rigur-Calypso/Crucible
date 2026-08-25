@@ -1,0 +1,21 @@
+# secrets — never commit real ones
+.env
+*.env
+!.env.example
+
+# node
+node_modules/
+dist/
+*.log
+npm-debug.log*
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/

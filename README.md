@@ -80,7 +80,7 @@ passes and both layers are proven.
 
 ## Qodo Code Review Evidence
 Every substantive change in this repo goes through a GitHub pull request reviewed by Qodo before
-merge; direct pushes to `main` are not used.
+merge; direct pushes to `main` are not used. Setup + per-PR workflow: `docs/QODO_SETUP.md`.
 
 - **Representative reviewed PR:** _TODO: link a merged PR containing meaningful hackathon code._
 - **What Qodo surfaced and what we did:** _TODO: 1–2 sentences on a real finding and the change

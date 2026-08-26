@@ -1,0 +1,85 @@
+/**
+ * Integration tests for the wired MCP server (src/index.ts). These exercise the real
+ * @modelcontextprotocol/sdk request path in-process (no child process) via a linked in-memory
+ * transport pair, so they cover tool registration, schemas, and result shaping — not just the
+ * pure tool functions.
+ *
+ * Run: `npm test`.
+ */
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createServer } from "../src/index.ts";
+
+async function connectedClient(): Promise<Client> {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createServer();
+  const client = new Client({ name: "test", version: "0.0.0" });
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  return client;
+}
+
+function textOf(result: unknown): string {
+  const content = (result as { content?: Array<{ text?: string }> }).content;
+  return content?.[0]?.text ?? "";
+}
+
+test("registers exactly the five Crucible tools", async () => {
+  const client = await connectedClient();
+  const { tools } = await client.listTools();
+  assert.deepEqual(
+    tools.map((t) => t.name).sort(),
+    ["connect", "fetch_file", "get_challenge", "list_challenges", "submit_flag"],
+  );
+  await client.close();
+});
+
+test("list_challenges returns arena metadata", async () => {
+  const client = await connectedClient();
+  const res = await client.callTool({ name: "list_challenges", arguments: {} });
+  assert.match(textOf(res), /web-01/);
+  await client.close();
+});
+
+test("submit_flag validates the correct flag server-side and rejects a wrong one", async () => {
+  const client = await connectedClient();
+  const ok = await client.callTool({
+    name: "submit_flag",
+    arguments: { challenge_id: "web-01", flag: "crucible{sqli_auth_bypass_web01}" },
+  });
+  assert.match(textOf(ok), /"correct": true/);
+  const bad = await client.callTool({
+    name: "submit_flag",
+    arguments: { challenge_id: "web-01", flag: "crucible{nope}" },
+  });
+  assert.match(textOf(bad), /"correct": false/);
+  await client.close();
+});
+
+test("connect FAILS CLOSED on a non-arena destination and flags an error", async () => {
+  const client = await connectedClient();
+  const res = await client.callTool({ name: "connect", arguments: { host: "8.8.8.8", port: 5000 } });
+  assert.equal(res.isError, true);
+  assert.match(textOf(res), /outside the arena subnet/);
+  await client.close();
+});
+
+test("connect allows an arena IP on a permitted port and pins the resolved IP", async () => {
+  const client = await connectedClient();
+  const res = await client.callTool({ name: "connect", arguments: { host: "10.42.0.5", port: 5000 } });
+  assert.notEqual(res.isError, true);
+  assert.match(textOf(res), /"target": "10.42.0.5:5000"/);
+  await client.close();
+});
+
+test("fetch_file rejects path traversal", async () => {
+  const client = await connectedClient();
+  const res = await client.callTool({
+    name: "fetch_file",
+    arguments: { challenge_id: "web-01", filename: "../../etc/passwd" },
+  });
+  assert.match(textOf(res), /path traversal rejected/);
+  await client.close();
+});

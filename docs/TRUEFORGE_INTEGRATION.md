@@ -87,6 +87,12 @@ pause is enforced server-side (test that a denied action does not execute).
 **Demo requirement.** The pause must fire visibly at least once, showing the Security Case at
 `AWAITING AUTHORIZATION` with `[AUTHORIZE] [DENY]`.
 
+**Verified — the gate holds even from inside the sandbox.** With the sandbox enabled (demo
+profile), we tested the agent invoking the approval-gated `http_request` *from* Code Mode via the
+sandbox's `mcp_client`. TrueForge **intercepted it and still demanded approval** — the call did not
+execute. So enabling the sandbox does not open an approval-bypass: the human gate applies to a
+tool call regardless of whether the agent or its sandboxed code initiates it.
+
 ## 4. Subagents — meaningful delegation (P1, optional)
 
 **How we might use it.** A coordinator dispatches subagents with distinct jobs — Recon (enumerate

@@ -93,6 +93,24 @@ shown is real.** Record at 1440p+, hide the terminal that holds `CRUCIBLE_MCP_TO
 - [ ] The network boundary rejecting a non-arena destination (Layer 1 and/or Layer 2)
 - [ ] The final security-finding card
 
+## Optional beat — "code running in the sandbox" (satisfies the hackathon's literal wording)
+The hackathon lists "code running in the sandbox" as something to show. By default we keep the
+sandbox **off** (standalone can't lock its egress). To include the beat, enable the **demo profile**:
+```
+CRUCIBLE_ENABLE_SANDBOX=true TF_MODEL_API_KEY=<key> MODEL_PROVIDER=google-gemini \
+  MODEL_ID=gemini-3.5-flash-lite MODEL_NAME=gemini-3-5-flash-lite node scripts/trueforge-setup.mjs
+```
+Now the agent writes and **runs a Python PoC in the sandbox** (a *local dry-run* that crafts the
+`admin'--` payload) **before** the approval gate — visible on screen as `exec` / `sandbox.created`.
+**Bonus safety point (verified):** if the agent tries to fire the live exploit *from* the sandbox
+(via Code Mode's `mcp_client`), **TrueForge still intercepts it and demands approval** — the gate
+holds even from inside the sandbox. Narrate: *"even code the agent writes can't skip the human gate."*
+
+Caveats — say them or skip the beat: in **standalone** mode the sandbox falls back to **local host
+execution** (not true isolation; configure a Daytona provider for that), and the lightweight
+flash-lite model sometimes lingers on the dry-run — **test 2–3 takes**; if it's not clean, cut this
+beat and keep the default (sandbox-off) run, which is rock-solid.
+
 ## Cut order if a beat is flaky
 Drop the TrueForge-extras montage (subagents/sessions) first, then trim investigation detail.
 **Never cut:** the approval pause, the controlled exploit, the boundary rejection — those three win

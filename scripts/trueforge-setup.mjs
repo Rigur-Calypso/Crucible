@@ -172,10 +172,23 @@ async function configureModel() {
   return r.status < 400;
 }
 
+// Demo profile: when the sandbox is enabled, ask the agent to write + run a local PoC dry-run in
+// the sandbox BEFORE the approval gate — the literal "code running in the sandbox" demo beat. It
+// does not touch the live target, so it needs no approval; the real exploit still goes through the
+// approval-gated http_request.
+const SANDBOX_ADDENDUM = `
+
+## Local PoC dry-run (sandbox enabled)
+Before you request authorization for the live target, WRITE a short Python proof-of-concept that
+builds the SQL-injection login payload (username \`admin'--\`, any password) and RUN it in your
+sandbox to validate the payload shape and your reasoning. This is a LOCAL dry-run — it does NOT
+touch the live target and needs NO approval. Print the crafted request so it is visible. THEN
+request authorization and send the real exploit via \`http_request\`.`;
+
 async function createAgent() {
   const manifest = {
     model: { name: `${PROVIDER}/${MODEL_NAME}` },
-    instructions: SYSTEM_PROMPT,
+    instructions: ENABLE_SANDBOX ? SYSTEM_PROMPT + SANDBOX_ADDENDUM : SYSTEM_PROMPT,
     mcp_servers: [
       {
         name: "crucible",
@@ -185,7 +198,7 @@ async function createAgent() {
       },
     ],
     config: {
-      sandbox: { enabled: ENABLE_SANDBOX },
+      sandbox: { enabled: ENABLE_SANDBOX, file_downloads: ENABLE_SANDBOX },
       // Trim per-request context: the Crucible workflow doesn't need generative UI, the
       // ask-user tool, or dynamic subagents. Disabling them keeps requests small (important on
       // token-per-minute-limited tiers, e.g. Groq free) and the agent focused on the tools + gate.
@@ -206,6 +219,12 @@ async function createAgent() {
     console.log("  ", JSON.stringify(r.json));
   } else {
     console.log(`  agent 'crucible-agent' ready (sandbox ${ENABLE_SANDBOX ? "ON" : "OFF"}).`);
+    if (ENABLE_SANDBOX) {
+      console.log("  NOTE: sandbox ON adds a local PoC dry-run beat. In STANDALONE mode TrueForge's");
+      console.log("  sandbox falls back to LOCAL host execution (bash/python) — not true isolation.");
+      console.log("  Only enable against the self-owned arena; configure a Daytona provider for real");
+      console.log("  isolation. The live exploit still goes through the approval-gated http_request.");
+    }
     console.log("  Open the TrueForge chat UI and give it:");
     console.log(
       '  "Investigate web-01 and determine whether authentication can be bypassed. Ask me before executing against the target."',

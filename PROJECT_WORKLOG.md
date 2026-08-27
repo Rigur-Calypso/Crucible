@@ -520,3 +520,34 @@ Rebased onto main (which merged PR #6); the setup script now carries both the Gr
   the automated safety test, against the self-owned arena.
 
 Full suite 40/40.
+
+---
+
+## 2026-08-27 (later) — Sandbox demo profile (optional "code in sandbox" beat) + safety verification
+
+### Objective
+Give an opt-in way to show the hackathon's literal "code running in the sandbox" beat without
+changing the safe default — and verify it doesn't open an approval bypass.
+
+### Actions
+- `scripts/trueforge-setup.mjs`: when `CRUCIBLE_ENABLE_SANDBOX=true`, enable the agent sandbox +
+  file_downloads and append a "local PoC dry-run" instruction so the agent writes and runs a Python
+  PoC (crafts the `admin'--` payload, prints it) in the sandbox before the approval gate. Prints an
+  honest caveat that standalone falls back to local host execution.
+- Documented in `docs/DEMO_SHOTLIST.md` (optional beat + caveats), `docs/TRUEFORGE_SETUP.md`, and
+  `docs/TRUEFORGE_INTEGRATION.md` §3.
+
+### Verification (live, gemini-3.5-flash-lite)
+- With the profile on, the agent **created a sandbox and ran Python `exec`** (visible
+  `sandbox.created` + `exec` events) to craft the payload locally — the "code in sandbox" beat.
+- **Safety test:** instructed the agent to fire the approval-gated `http_request` *from* the sandbox
+  via Code Mode's `mcp_client`. Result: **TrueForge intercepted it and demanded approval; the call
+  did not execute, no flag leaked.** The gate holds even from inside the sandbox — enabling the
+  sandbox does NOT create an approval bypass. (The agent even reported this as a finding.)
+
+### Reliability note
+Flash-lite sometimes lingers on the sandbox dry-run and doesn't proceed to the exploit; the default
+(sandbox-off) path remains the rock-solid demo. Treat the sandbox beat as optional; test 2–3 takes.
+
+### Current status
+Demo profile built + safety-verified. Default stays sandbox-off. On `feature/readme-quickstart-final`.

@@ -147,10 +147,10 @@ subagents), which is most of what the Best UI criterion asks for.
 | Reach real tools | MCP client | Crucible MCP server: the only path to the arena |
 | Safe place to run generated code | Sandbox-as-tool | Agent-written PoC executes in the sandbox |
 | Stop before irreversible action | Human approval | Pause before `connect` / live-target payload |
-| Delegate | Subagents | Recon/Analysis/Evidence roles (optional) |
+| Delegate | Subagents | *Not implemented* — API available (design in D17, disabled) |
 | Survive reconnects | Sessions | Security Case continues after reconnect (optional) |
 | Any model | Model providers | BYO key, pinned for the demo |
-| Reusable instructions | Skills | Investigation playbook as a Skill (optional) |
+| Reusable instructions | Skills | *Not implemented* — API available, no Skill shipped |
 
 ## 10. Implementation verification checklist
 
@@ -180,12 +180,13 @@ reproducible wiring and `docs/TRUEFORGE_SETUP.md` for the run steps.
       bearer token (`CRUCIBLE_MCP_TOKEN`, sent via the connector's `auth: header`), enables
       DNS-rebinding Host validation, and bounds request bodies — so only TrueForge can invoke the
       tools, not an arbitrary local process.
-- [x] **Subagents.** `config.dynamic_sub_agents.enabled` (default true). Mechanism confirmed;
-      use only if it stays reliable (P1).
+- [ ] **Subagents — NOT wired up.** The harness supports `config.dynamic_sub_agents.enabled`, but
+      we **disable** it (`false`) and don't use subagents — kept the single-agent path reliable
+      (decision D17). API exists; capability not exercised.
 - [x] **Sessions / reconnect.** `POST /api/v1/sessions` + `/turns`, `/events`, `/subscribe`;
-      persisted in SQLite. Mechanism confirmed (P1).
-- [x] **Skills.** `config` + `manifest.skills[]` + `GET /api/v1/catalogs/skills`. Mechanism
-      confirmed (P2).
+      persisted in SQLite. A Security Case runs as a persisted session (used).
+- [ ] **Skills — NOT wired up.** The harness supports `manifest.skills[]` + `GET
+      /api/v1/catalogs/skills`, but we don't ship a Skill. API exists; capability not exercised.
 - [ ] **Model provider** needs a BYO key: `POST /api/v1/settings/model-providers`
       (openai/anthropic/google-gemini/fireworks/…). Supply via `TF_MODEL_API_KEY` — never committed.
 

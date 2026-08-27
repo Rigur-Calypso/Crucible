@@ -98,7 +98,6 @@ flowchart LR
 
 ---
 
-## 🏆 Why this wins (mapped to the judging criteria)
 
 | Criterion | How The Crucible answers it |
 |---|---|

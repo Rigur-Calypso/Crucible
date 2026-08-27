@@ -32,16 +32,18 @@ technical and human boundaries. That boundary *is* the product.
 ## How it uses TrueForge (load-bearing — remove it and the architecture collapses)
 
 - **MCP connector (remote, over HTTP).** The Crucible MCP server is the *only* path from the agent
-  to the arena, exposing five tools — `list_challenges`, `get_challenge`, `fetch_file`,
-  `submit_flag`, and the approval-gated `connect`. TrueForge registers it as a remote MCP server by
+  to the arena, exposing six tools — `list_challenges`, `get_challenge`, `fetch_file`,
+  `submit_flag`, and the two approval-gated live-target actions `connect` (reachability) and
+  `http_request` (the exploit — it sends the real request and returns the response, capturing the
+  flag). TrueForge registers it as a remote MCP server by
   URL; without the harness's MCP client the model has no hands.
 - **Human approval — the "License to Hack" gate.** The agent is configured with
-  `require_approval_for_tools: ["connect"]`, so TrueForge **pauses** before the single consequential
+  `require_approval_for_tools: ["connect", "http_request"]`, so TrueForge **pauses** before the single consequential
   action (touching the live target) and blocks until a person allows or denies. This is the real
   harness control, enforced outside the agent's reach — not a cosmetic dialog the agent can bypass.
 - **Sandbox-as-tool.** TrueForge can provision a sandbox for agent-written PoC code. We keep it
   **off by default**: standalone TrueForge doesn't expose a sandbox egress allowlist, so with the
-  sandbox off *all* target interaction flows through the allowlisted, approval-gated `connect`
+  sandbox off *all* target interaction flows through the allowlisted, approval-gated `connect` / `http_request`
   (an honest, safer default we document explicitly).
 - **Sessions, subagents, skills, any model.** A Security Case is a TrueForge session (persisted,
   survives reconnects); subagents and skills are available for function-split delegation; the model
@@ -52,13 +54,13 @@ technical and human boundaries. That boundary *is* the product.
 Defense in depth, both layers tested:
 
 - **Layer 1 — arena network egress.** The arena is an `internal: true` Docker network with **no
-  egress**. `arena/verify-arena.sh` proves it on the real network (7/7): a container on the arena
+  egress**. `arena/verify-arena.sh` proves it on the real network (9/9, incl. the http_request tool path): a container on the arena
   net reaches `web-01` by hostname but **cannot** reach `example.com` or `8.8.8.8`.
 - **Layer 2 — the `connect` in-code allowlist.** `connect` resolves the destination, validates
   **every** resolved address against the arena subnet, **pins** the IP (anti-DNS-rebinding), and
   opens a real socket only to an approved arena target — rejecting public IPs, loopback, private/
   link-local ranges, IPv6, malformed inputs, and alternate encodings. Fail-closed, with a 13-case
-  matrix plus in-process MCP integration tests (**31 tests total**).
+  matrix plus in-process MCP integration tests (**40 tests total**); `http_request` reuses the same allowlist.
 
 The MCP endpoint itself is hardened: **loopback-only** publish, **bearer-token auth** (via the
 connector's header auth), **DNS-rebinding Host validation**, and **bounded request bodies**.
@@ -86,10 +88,10 @@ containerized MCP server on the arena + edge networks); TrueForge v0.1.4 standal
 ```
 export CRUCIBLE_MCP_TOKEN=$(openssl rand -hex 32)
 docker compose -f arena/docker-compose.yml up -d --build --wait   # arena + MCP
-bash arena/verify-arena.sh                                         # 7/7 safety checks
+bash arena/verify-arena.sh                                         # 9/9 safety checks
 npx @truefoundry/trueforge                                         # the harness
 TF_MODEL_API_KEY=<your key> MODEL_PROVIDER=google-gemini \
-  MODEL_ID=gemini-3.6-flash MODEL_NAME=gemini-3-6-flash \
+  MODEL_ID=gemini-3.5-flash-lite MODEL_NAME=gemini-3-5-flash-lite \
   node scripts/trueforge-setup.mjs                                 # connector + model + agent
 ```
 Then open the TrueForge chat UI, pick `crucible-agent`, and give it a case. Full guide:

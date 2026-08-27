@@ -82,12 +82,21 @@ echo "== [4] http_request tool (production MCP path) =="
 # Exercise the approval-gated http_request tool over the real MCP endpoint: it should run the
 # login-bypass exploit and return the flag, and block a non-arena destination (fail-closed).
 CHECK="$HERE/../mcp-server/scripts/check-http-request.mjs"
+http_request_skipped=""
 if command -v node >/dev/null 2>&1 && [ -d "$HERE/../mcp-server/node_modules/@modelcontextprotocol" ]; then
   MCP_URL="${MCP_URL:-http://127.0.0.1:8848/mcp}" node "$CHECK" \
     || fail "http_request tool check failed (see output above)"
 else
-  echo "  SKIP (node or mcp-server deps unavailable; run 'npm --prefix mcp-server install')"
+  http_request_skipped=1
+  printf '  \033[33mSKIP\033[0m http_request tool check — node or mcp-server deps unavailable (run: npm --prefix mcp-server install)\n'
 fi
 
 echo
-echo "All arena checks passed. (Stop the arena with: docker compose -f arena/docker-compose.yml down)"
+if [ -n "$http_request_skipped" ]; then
+  # Do not claim unqualified success when a check did not run — say so explicitly (and fail under CI).
+  printf '\033[33mArena checks passed, but the http_request tool check was SKIPPED\033[0m (not verified: '
+  echo "tool registered/reachable/policy-enforced/returns the flag). Install mcp-server deps to include it."
+  [ -n "$CI" ] && fail "http_request tool check skipped under CI (deps required)"
+else
+  echo "All arena checks passed (incl. the http_request tool path). (Stop: docker compose -f arena/docker-compose.yml down)"
+fi

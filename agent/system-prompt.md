@@ -1,8 +1,8 @@
 # Crucible Agent — System Prompt
 
 > Paste into the TrueForge agent config. Grant it only the Crucible MCP tools. Configure
-> `connect` (and any sandbox execution that sends a payload to a live target) as
-> approval-required. Pin one model for demo determinism.
+> `connect` and `http_request` (the live-target actions), and any sandbox execution that sends a
+> payload to a live target, as approval-required. Pin one model for demo determinism.
 
 ---
 

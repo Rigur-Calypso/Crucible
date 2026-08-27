@@ -54,6 +54,24 @@ test("http_request reports an honest failure when the request errors", async () 
   assert.match(r.reason, /request failed/);
 });
 
+test("defaultFetcher rejects when the peer closes before the response completes", async () => {
+  const server = http.createServer((_req, res) => {
+    // Promise 100 bytes but send a few then abort the socket — a reset/partial response.
+    res.writeHead(200, { "content-length": "100" });
+    res.write("partial");
+    res.socket?.destroy();
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const port = (server.address() as AddressInfo).port;
+  try {
+    await assert.rejects(() =>
+      defaultFetcher({ ip: "127.0.0.1", port, host: "web-01", method: "GET", path: "/", timeoutMs: 2000, maxBytes: 64 * 1024 }),
+    );
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()));
+  }
+});
+
 test("defaultFetcher performs a real HTTP request against a local server", async () => {
   const server = http.createServer((req, res) => {
     let body = "";

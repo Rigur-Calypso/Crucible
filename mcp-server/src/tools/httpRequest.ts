@@ -74,12 +74,22 @@ export const defaultFetcher: HttpFetcher = (a) =>
             total += c.length;
           }
         });
-        res.on("end", () =>
-          resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8"), truncated }),
-        );
-        res.on("close", () =>
-          resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8"), truncated }),
-        );
+        let ended = false;
+        res.on("end", () => {
+          ended = true;
+          resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8"), truncated });
+        });
+        res.on("aborted", () => reject(new Error("response aborted before completion")));
+        res.on("close", () => {
+          if (ended) return; // normal completion already resolved
+          if (truncated) {
+            // We intentionally truncated at the byte cap; the partial body is the result.
+            resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8"), truncated: true });
+          } else {
+            // Peer closed before 'end' — a reset/partial response must NOT look like success.
+            reject(new Error("connection closed before the response completed"));
+          }
+        });
       },
     );
     req.on("timeout", () => req.destroy(new Error(`request timed out after ${a.timeoutMs}ms`)));

@@ -498,3 +498,25 @@ enough TPM for this agent (unlike Groq free, 8000 TPM). Sandbox stays OFF.
 `feature/http-exploit-tool` (off main). Branch order to merge cleanly: readme-qodo-evidence,
 submission-materials, setup-groq-support, then http-exploit-tool. Full build is functionally
 COMPLETE — the demo now shows a captured flag, not just a controlled connect.
+
+---
+
+## 2026-08-27 (later) — Qodo review of PR #7 (http-exploit-tool) + rebase
+
+Rebased onto main (which merged PR #6); the setup script now carries both the Groq support and
+`require_approval_for_tools: ["connect","http_request"]`. Qodo: 3 bugs + 1 rule violation:
+- **[bug] Incomplete responses report success** — `defaultFetcher` resolved on socket 'close' even
+  on a premature/reset response. **Fixed**: resolve only on 'end' (or an intentional truncation);
+  a peer that closes before completion now **rejects**. Added a premature-close test.
+- **[bug] Manual setup omits approval** — docs still gated only `connect`. **Fixed**: system prompt
+  note, `TRUEFORGE_SETUP`, and `TRUEFORGE_INTEGRATION` §3/§10 now require approval on BOTH `connect`
+  and `http_request` (the setup script already did).
+- **[bug] Skipped check still passes** — `verify-arena.sh` printed unqualified success when the
+  http_request check was skipped. **Fixed**: it now prints a SKIPPED warning and fails under `CI`.
+- **[rule] http_request bypasses approval gate** — **dismissed with reason** (same as PR #2 #1):
+  an MCP tool can't hold trustworthy approval state (the agent controls its inputs); approval is
+  enforced at the TrueForge harness layer, and the MCP endpoint is loopback-only + bearer-token, so
+  arbitrary callers can't reach it. The verify-arena helper calls the tool directly *on purpose* as
+  the automated safety test, against the self-owned arena.
+
+Full suite 40/40.

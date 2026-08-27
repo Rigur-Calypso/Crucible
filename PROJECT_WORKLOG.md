@@ -273,3 +273,26 @@ PR #2 ready on `feature/qodo-fixes-correctness` — addresses 5 of the 6 Qodo fi
 arena hostnames — a deployment step that depends on how TrueForge launches/connects to the MCP
 server (a genuine `[verify in impl]` for the harness milestone), tracked in
 `docs/TRUEFORGE_INTEGRATION.md` §10.
+
+---
+
+## 2026-08-27 (later) — Qodo re-review of PR #2 (3 Medium rule-violations)
+
+### Qodo findings on PR #2 (0 bugs, 3 rule violations, all Medium; Qodo endorsed the connect approach)
+1. **connect has no in-code approval gate** before the live socket — **dismissed with reason**:
+   an MCP tool cannot obtain trustworthy approval state (the agent controls tool inputs), so an
+   in-code gate would be theatre. Approval is enforced by TrueForge's harness-level gate, which
+   intercepts the call outside the agent's control (D7/D14). The denied-action-does-not-execute
+   test is tracked in the TrueForge milestone (`docs/TRUEFORGE_INTEGRATION.md` §10).
+2. **fetch_file lacked an ownership check** — **fixed**: `readChallengeFile` now authorizes the
+   challenge against the registry (`isKnownChallenge`) before resolving/reading; unknown ids fail
+   closed. Matches PRD D6 ("ownership check"). Added `isKnownChallenge`/`knownChallengeIds`.
+3. **CRUCIBLE_CHALLENGE_FILES_ROOT undocumented** — **fixed**: added to `.env.example` with a
+   non-secret placeholder and explanation.
+
+### Verification
+- `npm run typecheck` clean; `npm test`: **28/28** (added an ownership-check test).
+
+### Current status
+PR #2 updated on `feature/qodo-fixes-correctness`. Post the dismissal reason for finding #1 in its
+Qodo thread, let Qodo re-review the update, then merge.

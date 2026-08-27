@@ -14,3 +14,13 @@ export function listChallenges(): ChallengeSummary[] {
   // TODO: source from the arena manifest / each container's /challenge.json.
   return [{ id: "web-01", title: "Login Bypass", category: "web", points: 100 }];
 }
+
+/** The authoritative set of known challenge ids — used to authorize challenge-scoped access. */
+export function knownChallengeIds(): ReadonlySet<string> {
+  return new Set(listChallenges().map((c) => c.id));
+}
+
+/** Ownership/existence check: is this a challenge the arena actually serves? */
+export function isKnownChallenge(challengeId: string): boolean {
+  return knownChallengeIds().has(challengeId);
+}

@@ -135,6 +135,17 @@ test("fetch_file reads a real challenge artifact and returns base64 content", as
   await client.close();
 });
 
+test("fetch_file refuses an unknown challenge before any read (ownership check)", async () => {
+  const client = await connectedClient();
+  const res = await client.callTool({
+    name: "fetch_file",
+    arguments: { challenge_id: "not-a-real-challenge", filename: "briefing.txt" },
+  });
+  assert.equal(res.isError, true);
+  assert.match(textOf(res), /unknown challenge/);
+  await client.close();
+});
+
 test("fetch_file flags isError for a missing file", async () => {
   const client = await connectedClient();
   const res = await client.callTool({

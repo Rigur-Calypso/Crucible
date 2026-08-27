@@ -12,6 +12,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promises as fs } from "node:fs";
+import { isKnownChallenge } from "./listChallenges.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)); // mcp-server/src/tools
 /** Agent-facing artifact root. Override with CRUCIBLE_CHALLENGE_FILES_ROOT. */
@@ -57,15 +58,21 @@ export interface ReadResult {
 }
 
 /**
- * Resolve, verify (real path stays inside the challenge dir — defeats symlink escape), then read
- * and return the file's bytes as base64. Fails closed: traversal, symlink escape, missing file,
- * or a non-regular file all return `{ ok: false, reason }`.
+ * Authorize (challenge must be known), resolve, verify (real path stays inside the challenge dir
+ * — defeats symlink escape), then read and return the file's bytes as base64. Fails closed:
+ * unknown challenge, traversal, symlink escape, missing file, or a non-regular file all return
+ * `{ ok: false, reason }`.
  */
 export async function readChallengeFile(
   challengeId: string,
   filename: string,
   root: string = CHALLENGE_FILES_ROOT,
+  isKnown: (id: string) => boolean = isKnownChallenge,
 ): Promise<ReadResult> {
+  // Ownership/authorization: only serve files for a challenge the arena actually knows about.
+  // Path containment prevents traversal but does not by itself authorize the challenge scope.
+  if (!isKnown(challengeId)) return { ok: false, reason: "unknown challenge" };
+
   const resolved = resolveChallengeFile(challengeId, filename, root);
   if (!resolved.ok || resolved.path === undefined) {
     return { ok: false, reason: resolved.reason ?? "unresolved" };

@@ -346,3 +346,45 @@ and prove approval-denial blocks `connect`. Branch: `feature/trueforge-mcp-http-
 - Agent sandbox's own egress lockdown (Layer 1 for agent-written code) still to constrain via the
   sandbox provider config (`docs/TRUEFORGE_INTEGRATION.md` §10).
 - Approval "denied → not executed" proof and the full end-to-end Security Case need the model key.
+
+---
+
+## 2026-08-27 (later) — Qodo re-review of PR #3 (5 bugs + 5 rule violations) addressed
+
+The HTTP transport widened the attack surface; Qodo caught real gaps. All 10 addressed:
+
+- **[bug] System prompt parsed empty** — the `---` splitter dropped the whole body. Fixed the
+  parser (take everything after the single separator) + guard that rejects an empty prompt.
+- **[bug] Keyless setup couldn't create agent** — now the script skips agent creation entirely
+  when no model is configured, and says so (matches the docs).
+- **[bug] MCP endpoint exposed on all interfaces** — compose now publishes `127.0.0.1:8848:8848`
+  (loopback only); transport enables DNS-rebinding Host validation.
+- **[bug] Unbounded request body** — HTTP reader caps body size and returns 413 (drains, no
+  socket reset).
+- **[bug] Container ignored the lockfile** — Dockerfile now `COPY package-lock.json` + `npm ci`
+  for reproducible builds.
+- **[rule] Setup URLs allowed external hosts** — `TRUEFORGE_URL`/`MCP_URL` validated as loopback;
+  external hosts refused with a clear message.
+- **[rule] Sandbox egress unrestricted** — standalone TrueForge exposes no sandbox egress
+  allowlist, so the agent sandbox is now **OFF by default** (`CRUCIBLE_ENABLE_SANDBOX=true` to opt
+  in); with it off, all target interaction flows through the allowlisted, approval-gated `connect`.
+  Documented in SECURITY_MODEL §3a + TRUEFORGE_INTEGRATION §10.
+- **[rule] HTTP path bypassed approval / unauthenticated** — MCP endpoint now requires a bearer
+  token (`CRUCIBLE_MCP_TOKEN`) sent via the connector's `auth: header`; only TrueForge can invoke
+  the tools. (The human-approval decision itself remains TrueForge's, per D7/D14.)
+- **[rule] Env vars undocumented** — added all six + `CRUCIBLE_MCP_TOKEN` to `.env.example`.
+- **[rule] No E2E tests for the production path** — added `test/http.test.ts` exercising the real
+  Streamable HTTP transport: bearer-token 401, tools/list, `connect` failing closed, and the 413
+  body limit. (Full TrueForge-orchestration E2E — approval denial — still needs the harness+key.)
+
+### Verification
+- `npm test`: **31/31** (added 3 HTTP transport tests). Refactored `http.ts` to a testable
+  `createHttpServer(opts)` factory.
+- Rebuilt the container (`npm ci`): healthy, published on `127.0.0.1:8848` only. Unauthed request
+  → **401**; authed `connect('web-01',5000)` → **connected: true**. Prompt parser → 2923 chars.
+  External-host setup URL → refused.
+
+### Current status
+PR #3 hardened on `feature/trueforge-mcp-http-integration`. Push, let Qodo re-review, merge.
+The only remaining live-run proofs (approval-denied blocks `connect`; full Security Case) need a
+BYO model key.

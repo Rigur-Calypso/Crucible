@@ -3,9 +3,10 @@
 FROM node:22-slim
 WORKDIR /app
 
-# Install deps first for layer caching. tsx (a devDependency) runs the TS directly — no build step.
-COPY package.json ./
-RUN npm install --no-audit --no-fund
+# Install deps first for layer caching, from the committed lockfile for reproducible builds.
+# `npm ci` needs both manifests; keep dev deps because the runtime command uses tsx.
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 COPY tsconfig.json ./
 COPY src ./src

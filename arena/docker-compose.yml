@@ -41,10 +41,15 @@ services:
     build: ../mcp-server
     container_name: crucible-mcp
     networks: [arena, edge]
-    ports: ["8848:8848"]        # http://localhost:8848/mcp — register this URL in TrueForge
+    # Loopback-only publish: reachable from TrueForge on THIS host, not from other network peers.
+    ports: ["127.0.0.1:8848:8848"]   # http://127.0.0.1:8848/mcp — register this URL in TrueForge
     environment:
       CRUCIBLE_MCP_PORT: "8848"
       CRUCIBLE_MCP_PATH: "/mcp"
+      # Shared-secret auth so only TrueForge (which sends the header) can invoke the tools.
+      # Set CRUCIBLE_MCP_TOKEN in your shell/.env before `up`; scripts/trueforge-setup.mjs reuses it.
+      CRUCIBLE_MCP_TOKEN: "${CRUCIBLE_MCP_TOKEN:-}"
+      CRUCIBLE_MCP_ALLOWED_HOSTS: "127.0.0.1:8848,localhost:8848"
     depends_on:
       web-01:
         condition: service_healthy

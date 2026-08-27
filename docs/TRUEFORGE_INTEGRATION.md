@@ -162,10 +162,16 @@ reproducible wiring and `docs/TRUEFORGE_SETUP.md` for the run steps.
       `@destructive` / `@write` / `@read-only` / explicit tool names. We set `["connect"]`; our
       read tools carry `readOnlyHint`, `connect` carries `destructiveHint`. *Still to prove with a
       live model run:* that a **denied** approval provably does not execute `connect`.
-- [~] **Sandbox.** Enabled per agent via `config.sandbox.enabled`; a local sandbox fallback is
-      available in standalone mode. The sandbox's *own* egress lockdown (Layer 1 for agent-written
-      code) is separate from the MCP↔arena path and remains to be constrained via the sandbox
-      provider config **[verify in impl]**.
+- [~] **Sandbox — OFF by default.** Enabled per agent via `config.sandbox.enabled`; standalone
+      TrueForge (Daytona / local fallback) exposes **no sandbox egress allowlist**, so enabling it
+      does not confine agent-written code to the arena. We default it OFF
+      (`CRUCIBLE_ENABLE_SANDBOX=true` to opt in); with it off, all target interaction flows through
+      the allowlisted, approval-gated `connect`. Constraining sandbox egress (Daytona net policy /
+      egress-firewalled image) remains **[verify in impl]**. See `SECURITY_MODEL.md` §3a.
+- [x] **MCP endpoint hardening.** The remote MCP server is published loopback-only, requires a
+      bearer token (`CRUCIBLE_MCP_TOKEN`, sent via the connector's `auth: header`), enables
+      DNS-rebinding Host validation, and bounds request bodies — so only TrueForge can invoke the
+      tools, not an arbitrary local process.
 - [x] **Subagents.** `config.dynamic_sub_agents.enabled` (default true). Mechanism confirmed;
       use only if it stays reliable (P1).
 - [x] **Sessions / reconnect.** `POST /api/v1/sessions` + `/turns`, `/events`, `/subscribe`;

@@ -68,8 +68,9 @@ TrueForge's. The story is: agent-written code → TrueForge sandbox → controll
 ## 3. Human approval — the "License to Hack" gate (P0)
 
 **How we use it.** TrueForge pauses before sensitive actions until a person approves. We mark as
-sensitive: any `connect` call, and any sandbox execution that sends a payload to a live
-challenge service. Everything upstream — recon, reading files, forming a hypothesis, generating
+sensitive: any `connect` call **and any `http_request` call** (the live-target actions), plus any
+sandbox execution that sends a payload to a live challenge service. Everything upstream — recon,
+reading files, forming a hypothesis, generating
 and *locally testing* a PoC — runs autonomously. The pause lands exactly at the meaningful
 security boundary: the moment before the agent acts on the target.
 
@@ -159,8 +160,9 @@ reproducible wiring and `docs/TRUEFORGE_SETUP.md` for the run steps.
       → this is *why* the MCP server is served over Streamable HTTP and containerized onto the
       arena network (also resolving the arena-DNS finding).
 - [x] **Per-agent approval control.** `mcp_servers[].require_approval_for_tools` accepts
-      `@destructive` / `@write` / `@read-only` / explicit tool names. We set `["connect"]`; our
-      read tools carry `readOnlyHint`, `connect` carries `destructiveHint`. *Still to prove with a
+      `@destructive` / `@write` / `@read-only` / explicit tool names. We set
+      `["connect", "http_request"]` (both live-target actions); our read tools carry `readOnlyHint`,
+      while `connect` and `http_request` carry `destructiveHint`. *Still to prove with a
       live model run:* that a **denied** approval provably does not execute `connect`.
 - [~] **Sandbox — OFF by default.** Enabled per agent via `config.sandbox.enabled`; standalone
       TrueForge (Daytona / local fallback) exposes **no sandbox egress allowlist**, so enabling it

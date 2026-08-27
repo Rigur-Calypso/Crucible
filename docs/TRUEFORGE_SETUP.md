@@ -55,7 +55,7 @@ TF_MODEL_API_KEY=$GROQ_API_KEY MODEL_PROVIDER=groq \
 > adequate TPM. Gemini free tier is `limit: 0` (needs billing). The setup script disables generative
 > UI / ask-user / subagents to keep requests lean, but the base agent context is still sizeable.
 This registers the `crucible` MCP connector (with the bearer token), and — **only when a model is
-configured** — creates the `crucible-agent` with `require_approval_for_tools: ["connect"]` (the
+configured** — creates the `crucible-agent` with `require_approval_for_tools: ["connect", "http_request"]` (the
 **"License to Hack"** gate). Without a key it stops after the connector and tells you so.
 
 The API key and the MCP token are read from the environment only — **never committed**.

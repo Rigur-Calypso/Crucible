@@ -22,6 +22,8 @@ async function withServer(fn: (baseUrl: string) => Promise<void>): Promise<void>
   try {
     await fn(`http://127.0.0.1:${port}`);
   } finally {
+    // Force-drop any lingering keep-alive/SSE sockets so server.close() can't hang.
+    server.closeAllConnections?.();
     await new Promise<void>((r) => server.close(() => r()));
   }
 }
@@ -45,7 +47,7 @@ test("HTTP: authed MCP client lists tools and connect fails closed", async () =>
     const client = new Client({ name: "http-test", version: "0.0.0" });
     await client.connect(transport);
     const { tools } = await client.listTools();
-    assert.equal(tools.length, 5);
+    assert.equal(tools.length, 6);
     const blocked = await client.callTool({ name: "connect", arguments: { host: "8.8.8.8", port: 443 } });
     assert.equal(blocked.isError, true);
     await client.close();

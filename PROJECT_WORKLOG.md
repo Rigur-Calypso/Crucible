@@ -459,3 +459,64 @@ Qodo: 0 bugs, 2 Medium rule violations. Both addressed:
   pure exported helpers and added `mcp-server/test/setup-manifest.test.ts` (native vs custom/Groq
   manifest shapes; https-only validation). Guarded `main()` behind an import.meta check so the
   script is importable without side effects. Full suite 34/34.
+---
+
+## 2026-08-27 (later) — http_request tool: full end-to-end Security Case WORKS
+
+### Objective
+`connect` only proved TCP reachability, so the agent couldn't retrieve the flag. Add an
+approval-gated tool that performs the real HTTP exploit and returns the response, completing the
+recon → approval → exploit → flag → finding arc.
+
+### Actions
+- Added `mcp-server/src/tools/httpRequest.ts` — approval-gated `http_request`: same Layer-2
+  allowlist as `connect` (fail-closed), connects to the PINNED IP (anti-rebinding, Host header =
+  hostname), bounded response body, injectable fetcher. Registered in `index.ts` (6th tool,
+  `destructiveHint`).
+- Tests: `test/httpRequest.test.ts` (policy fail-closed, pinned-IP, honest failure, real-socket
+  against a local server) + an MCP-level http_request test in `server.test.ts`. **36/36 pass.**
+- Fixed a latent hang in `test/http.test.ts` teardown (`server.closeAllConnections()` before
+  close) and updated tool-count assertions to 6.
+- System prompt: step 6 now directs `http_request` with the web-01 login-bypass payload.
+- Setup script: `require_approval_for_tools: ["connect","http_request"]`; connector description.
+
+### Verification — LIVE, on free Gemini flash-lite quota
+Rebuilt the MCP container (6 tools served), reconfigured `crucible-agent`
+(`google-gemini/gemini-3-5-flash-lite`, approvals on connect+http_request, trimmed context), and
+drove a real Security Case via the TrueForge API:
+- recon (list_challenges → get_challenge web-01) → SQLi hypothesis
+- `http_request` POST /login `username=admin'--&password=x` → **tool.approval_required → allow**
+- response: `{"flag":"crucible{sqli_auth_bypass_web01}","ok":true}` (HTTP 200) — real exploit
+- `submit_flag` → `{"correct":true,"points_awarded":100}`
+- agent emitted the structured SECURITY FINDING (Authentication bypass (SQL Injection), HIGH).
+
+### Model/quota notes
+Gemini free tier: Pro is `limit: 0`, but **`gemini-3.5-flash-lite` runs on free quota** and has
+enough TPM for this agent (unlike Groq free, 8000 TPM). Sandbox stays OFF.
+
+### Current status
+`feature/http-exploit-tool` (off main). Branch order to merge cleanly: readme-qodo-evidence,
+submission-materials, setup-groq-support, then http-exploit-tool. Full build is functionally
+COMPLETE — the demo now shows a captured flag, not just a controlled connect.
+
+---
+
+## 2026-08-27 (later) — Qodo review of PR #7 (http-exploit-tool) + rebase
+
+Rebased onto main (which merged PR #6); the setup script now carries both the Groq support and
+`require_approval_for_tools: ["connect","http_request"]`. Qodo: 3 bugs + 1 rule violation:
+- **[bug] Incomplete responses report success** — `defaultFetcher` resolved on socket 'close' even
+  on a premature/reset response. **Fixed**: resolve only on 'end' (or an intentional truncation);
+  a peer that closes before completion now **rejects**. Added a premature-close test.
+- **[bug] Manual setup omits approval** — docs still gated only `connect`. **Fixed**: system prompt
+  note, `TRUEFORGE_SETUP`, and `TRUEFORGE_INTEGRATION` §3/§10 now require approval on BOTH `connect`
+  and `http_request` (the setup script already did).
+- **[bug] Skipped check still passes** — `verify-arena.sh` printed unqualified success when the
+  http_request check was skipped. **Fixed**: it now prints a SKIPPED warning and fails under `CI`.
+- **[rule] http_request bypasses approval gate** — **dismissed with reason** (same as PR #2 #1):
+  an MCP tool can't hold trustworthy approval state (the agent controls its inputs); approval is
+  enforced at the TrueForge harness layer, and the MCP endpoint is loopback-only + bearer-token, so
+  arbitrary callers can't reach it. The verify-arena helper calls the tool directly *on purpose* as
+  the automated safety test, against the self-owned arena.
+
+Full suite 40/40.

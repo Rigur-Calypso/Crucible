@@ -1,5 +1,7 @@
 # DEMO_PLAN.md — The Crucible
 
+> Operational per-beat shot-list (exact clicks/prompts/pre-flight): `docs/DEMO_SHOTLIST.md`.
+
 ~3-minute demo video. The demo is judged as hard as the code, and control & safety is "the
 criterion nobody films" — so we film it. On-theme with the hackathon's Bond "License to act"
 framing; our gate is the "License to Hack."

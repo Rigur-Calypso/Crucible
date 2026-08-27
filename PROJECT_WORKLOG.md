@@ -388,3 +388,35 @@ The HTTP transport widened the attack surface; Qodo caught real gaps. All 10 add
 PR #3 hardened on `feature/trueforge-mcp-http-integration`. Push, let Qodo re-review, merge.
 The only remaining live-run proofs (approval-denied blocks `connect`; full Security Case) need a
 BYO model key.
+
+---
+
+## 2026-08-27 (later) — PR #3 merged; live-run attempt + submission materials
+
+### Actions
+- PR #3 merged to `main` (TrueForge integration). Drafted the README `## Qodo Code Review Evidence`
+  section from the real PR #1–#3 findings (branch `feature/readme-qodo-evidence`).
+- Attempted a live end-to-end Security Case against the Gemini agent via the TrueForge API
+  (POST /sessions → /turns; approval via `user.tool_approval`). Verified all wiring dispatches:
+  session created, turn accepted, agent + approval config live, MCP connector reachable.
+- Wrote `SUBMISSION_WRITEUP.md` (what it does + how it uses TrueForge, load-bearing) and
+  `docs/DEMO_SHOTLIST.md` (precise per-beat shot-list for the ~3-min video).
+
+### Failure / unexpected result — model quota (external, on the key)
+- The turn errored 429: Google Gemini **free tier `limit: 0`** for `gemini-3.1-pro`
+  ("Quota exceeded ... generate_content_free_tier_requests, limit: 0"). Switched the provider +
+  agent to `gemini-3.6-flash`; the flash turn then hung in retry with no output. Root cause: the
+  API key has **no usable quota (billing not enabled)** on the Google project — not a Crucible bug.
+- **Everything up to the model call is proven**: TrueForge dispatches the turn, the agent is
+  configured with `require_approval_for_tools: ["connect"]` and sandbox off, and the MCP tools are
+  reachable. The live autonomous run (approval pause firing, exploit, finding) needs a Gemini key
+  with billing enabled, or another provider/key with quota.
+
+### Fix / next
+- User to enable billing on the Gemini API key (or use a key/provider with quota), then re-run the
+  live case per `docs/DEMO_SHOTLIST.md` pre-flight. Model is already switched to `gemini-3-6-flash`.
+
+### Current status
+Product complete on `main`. Open PRs to merge: `feature/readme-qodo-evidence` (Qodo evidence) and
+`feature/submission-materials` (write-up + shot-list). Remaining for submission: a Gemini key with
+quota → record the ~3-min demo; the write-up is drafted.

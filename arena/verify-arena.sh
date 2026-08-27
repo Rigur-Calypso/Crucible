@@ -16,7 +16,6 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE="$HERE/docker-compose.yml"
-NET="crucible-arena_arena"
 CURL="curlimages/curl:latest"
 EXPECTED_IP="10.42.0.5"
 EXPECTED_FLAG="crucible{sqli_auth_bypass_web01}"
@@ -25,8 +24,14 @@ pass() { printf '  \033[32mPASS\033[0m %s\n' "$1"; }
 fail() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; exit 1; }
 
 echo "== bringing up the arena =="
-docker compose -f "$COMPOSE" up -d --build >/dev/null
+# --wait blocks until the web-01 healthcheck reports healthy, so we never race startup.
+docker compose -f "$COMPOSE" up -d --build --wait >/dev/null
 docker pull -q "$CURL" >/dev/null
+
+# Derive the ACTUAL network name from the running container rather than assuming a project-derived
+# name — robust to COMPOSE_PROJECT_NAME / -p overrides. (container_name is fixed in compose.)
+NET="$(docker inspect crucible-web-01 --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}')"
+[ -n "$NET" ] || fail "could not determine the arena network name from crucible-web-01"
 
 echo "== network posture =="
 internal="$(docker network inspect "$NET" --format '{{.Internal}}')"
@@ -39,9 +44,16 @@ ip="$(docker inspect crucible-web-01 --format '{{range .NetworkSettings.Networks
 run() { docker run --rm --network "$NET" "$CURL" "$@"; }
 
 echo "== [1] reachability =="
-run -s --max-time 5 http://web-01:5000/challenge.json | grep -q '"id":"web-01"' \
-  && pass "web-01 serves /challenge.json by hostname" \
-  || fail "web-01 not reachable on the arena network"
+# --wait already gates on health; retry anyway (bounded) so a slow first probe never false-fails.
+reachable=""
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  if run -s --max-time 5 http://web-01:5000/challenge.json | grep -q '"id":"web-01"'; then
+    reachable=1; break
+  fi
+  sleep 1
+done
+[ -n "$reachable" ] && pass "web-01 serves /challenge.json by hostname" \
+  || fail "web-01 not reachable on the arena network (after 10 attempts)"
 
 echo "== [2] control + exploit =="
 run -s --max-time 5 -X POST http://web-01:5000/login -d 'username=admin&password=wrong' \

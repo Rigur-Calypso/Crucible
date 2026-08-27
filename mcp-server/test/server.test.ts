@@ -74,12 +74,62 @@ test("connect allows an arena IP on a permitted port and pins the resolved IP", 
   await client.close();
 });
 
-test("fetch_file rejects path traversal", async () => {
+test("fetch_file rejects path traversal and flags isError", async () => {
   const client = await connectedClient();
   const res = await client.callTool({
     name: "fetch_file",
     arguments: { challenge_id: "web-01", filename: "../../etc/passwd" },
   });
   assert.match(textOf(res), /path traversal rejected/);
+  assert.equal(res.isError, true);
+  await client.close();
+});
+
+test("fetch_file reads a real challenge artifact and returns base64 content", async () => {
+  const client = await connectedClient();
+  const res = await client.callTool({
+    name: "fetch_file",
+    arguments: { challenge_id: "web-01", filename: "briefing.txt" },
+  });
+  assert.notEqual(res.isError, true);
+  const text = textOf(res);
+  assert.match(text, /"encoding": "base64"/);
+  const parsed = JSON.parse(text) as { content: string };
+  const decoded = Buffer.from(parsed.content, "base64").toString("utf8");
+  assert.match(decoded, /investigator briefing/);
+  await client.close();
+});
+
+test("fetch_file flags isError for a missing file", async () => {
+  const client = await connectedClient();
+  const res = await client.callTool({
+    name: "fetch_file",
+    arguments: { challenge_id: "web-01", filename: "does-not-exist.bin" },
+  });
+  assert.equal(res.isError, true);
+  assert.match(textOf(res), /not found/);
+  await client.close();
+});
+
+test("get_challenge flags isError for an unknown challenge", async () => {
+  const client = await connectedClient();
+  const res = await client.callTool({ name: "get_challenge", arguments: { challenge_id: "nope-99" } });
+  assert.equal(res.isError, true);
+  await client.close();
+});
+
+test("submit_flag: wrong-but-valid flag is NOT isError; unknown challenge IS", async () => {
+  const client = await connectedClient();
+  const wrong = await client.callTool({
+    name: "submit_flag",
+    arguments: { challenge_id: "web-01", flag: "crucible{nope}" },
+  });
+  assert.notEqual(wrong.isError, true); // a wrong flag is a normal negative result
+  assert.match(textOf(wrong), /"correct": false/);
+  const unknown = await client.callTool({
+    name: "submit_flag",
+    arguments: { challenge_id: "no-such", flag: "crucible{x}" },
+  });
+  assert.equal(unknown.isError, true);
   await client.close();
 });

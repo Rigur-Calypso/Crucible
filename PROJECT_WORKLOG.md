@@ -226,3 +226,43 @@ https://github.com/Rigur-Calypso/Crucible/pull/new/feature/project-foundation
 Arena verified on real Docker with Layer-1 containment proven. Next (needs the running harness):
 `npx @truefoundry/trueforge`, add the MCP connector, mark `connect` approval-required, wire its
 socket hand-off through the sandbox, and confirm the sandbox attaches only to the arena network.
+
+---
+
+## 2026-08-27 — PR #1 merged; addressing Qodo's review (PR #2)
+
+### Objective
+PR #1 was reviewed by Qodo and merged to `main`. Qodo raised 6 findings (1 High, 5 Medium).
+Address the correctness/robustness subset that needs no infra change (findings #2, #4, #5, #6)
+in PR #2; defer the architectural pair (#1 `connect` I/O, #3 arena DNS) to PR #3
+(containerize the MCP server onto the arena network).
+
+### Qodo findings (PR #1)
+1. **[High]** `connect` returns ok without opening a socket — deferred to PR #3.
+2. **[Med]** `fetch_file` returned a path, not content — **fixed here**.
+3. **[Med]** Arena hostname can't resolve (MCP runs on host, not on the arena net) — PR #3.
+4. **[Med]** Tool failures didn't set MCP `isError` — **fixed here**.
+5. **[Med]** Verifier raced service startup (no healthcheck/readiness) — **fixed here**.
+6. **[Med]** Verifier hard-coded the Compose network name — **fixed here**.
+
+### Actions
+- `fetchFile.ts`: added `readChallengeFile` — resolve (containment) + **symlink-escape guard** +
+  real read, returning base64 content; served from a dedicated agent-facing artifact root
+  (`mcp-server/challenge-files/`), never the arena container source (so the flag isn't reachable
+  via this tool). Added `challenge-files/web-01/briefing.txt`.
+- `index.ts`: every tool now sets MCP `isError` on a failed domain result (get_challenge unknown,
+  fetch_file failure, submit_flag unprocessable). A wrong-but-valid flag stays a normal result.
+- `docker-compose.yml`: added a python-based healthcheck to web-01.
+- `verify-arena.sh`: `up -d --wait` (blocks on healthy), network name **derived** from the
+  running container (robust to project-name overrides), and a bounded readiness retry.
+- Updated SECURITY_MODEL §5/§6 (fetch_file now implemented + symlink guard + tests).
+
+### Verification
+- `npm run typecheck` clean; `npm test`: **23/23** (added fetch_file read + isError coverage).
+- `bash arena/verify-arena.sh`: **7/7**, healthcheck gates startup ("Waiting → Healthy"),
+  network name derived correctly.
+
+### Current status
+PR #2 ready on `feature/qodo-fixes-correctness`. Next: PR #3 — containerize the MCP server,
+attach it to the internal arena network, and make `connect` open a real socket to the pinned IP
+(resolves Qodo #1 and #3 together).

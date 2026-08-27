@@ -17,25 +17,30 @@ import { z } from "zod";
 
 import { listChallenges } from "./tools/listChallenges.ts";
 import { getChallenge } from "./tools/getChallenge.ts";
-import { resolveChallengeFile } from "./tools/fetchFile.ts";
+import { readChallengeFile } from "./tools/fetchFile.ts";
 import { submitFlag } from "./tools/submitFlag.ts";
 import { connect } from "./tools/connect.ts";
 
 /** Pure tool functions, exported for reuse/tests independent of the MCP transport. */
-export const tools = { listChallenges, getChallenge, resolveChallengeFile, submitFlag, connect };
+export const tools = { listChallenges, getChallenge, readChallengeFile, submitFlag, connect };
 
 /**
  * Wrap a plain JSON result into an MCP tool result. The full JSON always travels in the text
  * content; `structuredContent` is attached only when the payload is a plain object, because the
  * MCP spec requires structured content to be a record (arrays/primitives would be rejected).
+ *
+ * `isError` marks a failed operation so clients/agents don't treat a failure as success. Pass it
+ * for any domain result that represents failure (unknown challenge, rejected path, blocked
+ * destination, etc.) — mirroring what the `connect` handler already does.
  */
-function jsonResult(payload: unknown) {
+function jsonResult(payload: unknown, isError = false) {
   const content = [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }];
   const isRecord =
     typeof payload === "object" && payload !== null && !Array.isArray(payload);
-  return isRecord
+  const base = isRecord
     ? { content, structuredContent: payload as Record<string, unknown> }
     : { content };
+  return isError ? { ...base, isError: true } : base;
 }
 
 export function createServer(): McpServer {
@@ -62,7 +67,10 @@ export function createServer(): McpServer {
         "required.",
       inputSchema: { challenge_id: z.string().min(1).describe("Challenge id, e.g. 'web-01'") },
     },
-    async ({ challenge_id }) => jsonResult(getChallenge(challenge_id)),
+    async ({ challenge_id }) => {
+      const result = getChallenge(challenge_id);
+      return jsonResult(result, "error" in result);
+    },
   );
 
   server.registerTool(
@@ -77,7 +85,10 @@ export function createServer(): McpServer {
         filename: z.string().min(1).describe("File within the challenge's own directory"),
       },
     },
-    async ({ challenge_id, filename }) => jsonResult(resolveChallengeFile(challenge_id, filename)),
+    async ({ challenge_id, filename }) => {
+      const result = await readChallengeFile(challenge_id, filename);
+      return jsonResult(result, result.ok === false);
+    },
   );
 
   server.registerTool(
@@ -92,7 +103,12 @@ export function createServer(): McpServer {
         flag: z.string().min(1).describe("The captured flag, e.g. 'crucible{...}'"),
       },
     },
-    async ({ challenge_id, flag }) => jsonResult(submitFlag(challenge_id, flag)),
+    async ({ challenge_id, flag }) => {
+      // A wrong-but-valid flag (correct:false, no reason) is a normal result, not an error.
+      // Only an unprocessable submission (unknown challenge / invalid input) sets isError.
+      const result = submitFlag(challenge_id, flag);
+      return jsonResult(result, result.reason !== undefined);
+    },
   );
 
   server.registerTool(
@@ -112,7 +128,7 @@ export function createServer(): McpServer {
     },
     async ({ host, port }) => {
       const result = await connect({ host, port });
-      return { ...jsonResult(result), isError: result.ok === false };
+      return jsonResult(result, result.ok === false);
     },
   );
 

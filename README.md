@@ -58,25 +58,50 @@ that a container on the arena network has **no egress to the public internet** (
 `docs/SECURITY_MODEL.md` §6.
 
 ### Running the MCP server
-_TODO: build/run steps for `mcp-server/`._
+The MCP server is containerized and comes up **with the arena** (the `mcp` service in
+`arena/docker-compose.yml`), served over Streamable HTTP at `http://127.0.0.1:8848/mcp`
+(loopback-only; health at `/health`). To run or test it directly:
+```
+cd mcp-server
+npm install
+npm run typecheck     # tsc strict + noUncheckedIndexedAccess
+npm test              # 40 tests: fail-closed policy + in-process MCP + HTTP transport + tools
+npm run start:http    # serve over Streamable HTTP (or `npm start` for stdio)
+```
 
-### Running TrueForge
+### Running TrueForge + wiring the agent
 ```
-npx @truefoundry/trueforge
-# connect a model (BYO key), add the Crucible MCP server under Connectors,
-# create the agent, and set approval on connect / live-target execution.
+npx @truefoundry/trueforge                    # harness UI + API at http://localhost:8790
+
+# register the connector, configure a model (BYO key), and create the agent (idempotent):
+TF_MODEL_API_KEY=<your key> MODEL_PROVIDER=google-gemini \
+  MODEL_ID=gemini-3.5-flash-lite MODEL_NAME=gemini-3-5-flash-lite \
+  node scripts/trueforge-setup.mjs
 ```
+`gemini-3.5-flash-lite` runs on Gemini's **free** tier. The script sets
+`require_approval_for_tools: ["connect", "http_request"]` (the "License to Hack" gate). Full guide:
+`docs/TRUEFORGE_SETUP.md`; OpenAI-compatible providers (e.g. Groq) via `MODEL_BASE_URL`.
 
 ### Running a Security Case
-_TODO: point the agent at web-01; watch investigate → PoC → sandbox test → approval → exploit →
-finding._
+Open the chat UI at `http://localhost:8790`, pick `crucible-agent`, and give it:
+> *"Investigate web-01 and determine whether authentication can be bypassed. Investigate freely,
+> but ask me before you execute anything against the live target."*
+
+Expected arc: recon (`list_challenges`/`get_challenge`) → hypothesis → **approval pause on
+`http_request`** → authorize → exploit → `submit_flag` → security finding. Beat-by-beat demo
+script: `docs/DEMO_SHOTLIST.md`.
 
 ## Testing
 ```
-# TODO: unit + security (fail-closed) + integration + end-to-end commands
+# MCP server: fail-closed network policy, in-process MCP, HTTP transport, tools (40 tests)
+cd mcp-server && npm run typecheck && npm test
+
+# Arena + Layer-1 containment + the http_request tool path (9 checks) — needs Docker
+bash arena/verify-arena.sh
 ```
 The security boundary is not "done" until the fail-closed matrix in `docs/SECURITY_MODEL.md` §6
-passes and both layers are proven.
+passes and both layers are proven. Current status: **40/40 unit/integration tests, 9/9 arena
+checks.**
 
 ## Qodo Code Review Evidence
 Every substantive change in this repo goes through a GitHub pull request reviewed by Qodo before

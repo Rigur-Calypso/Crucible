@@ -147,13 +147,40 @@ subagents), which is most of what the Best UI criterion asks for.
 
 ## 10. Implementation verification checklist
 
-Before claiming any capability "done", confirm against the live product:
-- [ ] MCP connector registration flow and per-agent tool grants **[verify in impl]**
-- [ ] Sandbox provider networking and how to constrain egress to the arena subnet **[verify in impl]**
-- [ ] Per-agent approval control; a denied action provably does not execute **[verify in impl]**
-- [ ] Subagent delegation API and hand-off semantics, if used **[verify in impl]**
-- [ ] Session persistence across a real reconnect, if demoed **[verify in impl]**
-- [ ] Skills loading, if used **[verify in impl]**
+Confirmed against **TrueForge v0.1.4** (standalone, `npx @truefoundry/trueforge`, SQLite, API at
+`/api/v1`, OpenAPI at `/api/v1/openapi.json`). See `scripts/trueforge-setup.mjs` for the exact,
+reproducible wiring and `docs/TRUEFORGE_SETUP.md` for the run steps.
+
+- [x] **MCP connector registration + per-agent tool grants.** TrueForge registers only *remote*
+      MCP servers by URL: `POST /api/v1/settings/mcp-servers` with
+      `manifest{type:"remote", name, url, description}`. Tools (with annotations) are visible at
+      `GET /api/v1/mcp-servers/crucible/tools`. Per-agent grants: an agent's
+      `mcp_servers[].enable_tools` / `disable_tools` (selectors `@all`, `@read-only`, or names).
+      → this is *why* the MCP server is served over Streamable HTTP and containerized onto the
+      arena network (also resolving the arena-DNS finding).
+- [x] **Per-agent approval control.** `mcp_servers[].require_approval_for_tools` accepts
+      `@destructive` / `@write` / `@read-only` / explicit tool names. We set `["connect"]`; our
+      read tools carry `readOnlyHint`, `connect` carries `destructiveHint`. *Still to prove with a
+      live model run:* that a **denied** approval provably does not execute `connect`.
+- [~] **Sandbox — OFF by default.** Enabled per agent via `config.sandbox.enabled`; standalone
+      TrueForge (Daytona / local fallback) exposes **no sandbox egress allowlist**, so enabling it
+      does not confine agent-written code to the arena. We default it OFF
+      (`CRUCIBLE_ENABLE_SANDBOX=true` to opt in); with it off, all target interaction flows through
+      the allowlisted, approval-gated `connect`. Constraining sandbox egress (Daytona net policy /
+      egress-firewalled image) remains **[verify in impl]**. See `SECURITY_MODEL.md` §3a.
+- [x] **MCP endpoint hardening.** The remote MCP server is published loopback-only, requires a
+      bearer token (`CRUCIBLE_MCP_TOKEN`, sent via the connector's `auth: header`), enables
+      DNS-rebinding Host validation, and bounds request bodies — so only TrueForge can invoke the
+      tools, not an arbitrary local process.
+- [x] **Subagents.** `config.dynamic_sub_agents.enabled` (default true). Mechanism confirmed;
+      use only if it stays reliable (P1).
+- [x] **Sessions / reconnect.** `POST /api/v1/sessions` + `/turns`, `/events`, `/subscribe`;
+      persisted in SQLite. Mechanism confirmed (P1).
+- [x] **Skills.** `config` + `manifest.skills[]` + `GET /api/v1/catalogs/skills`. Mechanism
+      confirmed (P2).
+- [ ] **Model provider** needs a BYO key: `POST /api/v1/settings/model-providers`
+      (openai/anthropic/google-gemini/fireworks/…). Supply via `TF_MODEL_API_KEY` — never committed.
 
 Do not document a capability as working until it has been exercised end-to-end and, where it's a
-security control, tested to fail closed.
+security control, tested to fail closed. The remaining live-run proofs (approval denial;
+end-to-end Security Case) require the model key.

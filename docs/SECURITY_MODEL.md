@@ -38,12 +38,23 @@ the network itself must say no.
   a live target — where the human gate attaches.
 A bug in one layer does not open the other. Both are tested (§6).
 
-### 3a. Egress architecture decision (finalize in impl — D4a)
-- **`connect`-only egress:** sandbox has no arena network; all target interaction via `connect`.
-- **Sandbox-direct + Layer 1 lockdown (default):** agent code makes normal requests; egress is
-  firewalled to the arena; `connect` remains the audited, gated action.
-Default to sandbox-direct **with Layer 1 locked down**; revisit after inspecting real sandbox
-networking. Whichever we pick, **the sandbox must not reach outside the arena.**
+### 3a. Egress architecture (resolved 2026-08-27 — D4a)
+The MCP server is served over HTTP and runs as a **container on two networks**: `arena` (internal,
+no egress) to reach targets, and `edge` (host-reachable) so TrueForge can reach its endpoint. All
+target interaction goes through **`connect`**, whose in-code allowlist (Layer 2) is the audited,
+approval-gated chokepoint. The MCP server is trusted enforcement code, so its host-reachability is
+fine; its endpoint is defended (loopback-only publish + bearer-token auth + DNS-rebinding Host
+allowlist + bounded bodies).
+
+**Layer 1 (agent sandbox egress) — known limitation.** TrueForge standalone (Daytona / local
+fallback) exposes **no sandbox egress allowlist**, so enabling the agent sandbox does not, by
+itself, confine agent-written code to the arena — such code could reach the internet directly,
+bypassing `connect`. We therefore **default the agent sandbox OFF** (`CRUCIBLE_ENABLE_SANDBOX`
+must be `true` to enable it); with it off, *all* target interaction flows through the allowlisted,
+approval-gated `connect`, and Layer 2 fully contains the agent. Enable the sandbox only against the
+self-owned arena, and only once its egress can be constrained (e.g. a Daytona network policy or an
+egress-firewalled sandbox image) — tracked in `TRUEFORGE_INTEGRATION.md` §10. Whichever path,
+**the sandbox must not reach outside the arena.**
 
 ## 4. Network policy (implemented in networkPolicy.ts)
 **Allow:** arena IP; arena hostname resolving *inside* the arena; approved port(s) only.

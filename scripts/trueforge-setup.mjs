@@ -18,7 +18,8 @@
  *
  * Env (see .env.example):
  *   TRUEFORGE_URL (default http://localhost:8790) · MCP_URL (default http://127.0.0.1:8848/mcp)
- *   MODEL_PROVIDER (openai|anthropic|google-gemini|fireworks|…) · MODEL_ID · MODEL_NAME
+ *   MODEL_PROVIDER (native type, or any name if MODEL_BASE_URL is set) · MODEL_ID · MODEL_NAME
+ *   MODEL_BASE_URL (set for OpenAI-compatible providers e.g. Groq → registered as `custom`)
  *   TF_MODEL_API_KEY (provider key; unset ⇒ skip provider + agent) · CRUCIBLE_MCP_TOKEN (MCP auth)
  *   CRUCIBLE_ENABLE_SANDBOX ("true" to enable the agent sandbox; default off — see note below)
  */
@@ -113,21 +114,28 @@ async function configureModel() {
     console.log("model provider: SKIPPED (set TF_MODEL_API_KEY to configure a runnable model).");
     return false;
   }
-  const manifest = {
-    type: PROVIDER,
-    auth: {
-      api_key: KEY,
+  const models = [
+    {
+      model_id: MODEL_ID,
+      name: MODEL_NAME,
+      properties: { context_length: 128000, max_output_tokens: 16000 },
     },
-    models: [
-      {
-        model_id: MODEL_ID,
-        name: MODEL_NAME,
-        properties: { context_length: 128000, max_output_tokens: 16000 },
-      },
-    ],
-  };
-  const r = await api("POST", "/settings/model-providers", { manifest });
-  console.log(`model provider (${PROVIDER}) -> ${r.status}`);
+  ];
+  // OpenAI-compatible providers (e.g. Groq) aren't native types — register them as `custom`
+  // with a base_url. Set MODEL_BASE_URL to switch into that mode; PROVIDER becomes the custom
+  // provider's name, so the agent references `${PROVIDER}/${MODEL_NAME}`.
+  const BASE_URL = process.env.MODEL_BASE_URL;
+  const manifest = BASE_URL
+    ? { type: "custom", name: PROVIDER, base_url: BASE_URL, auth: { api_key: KEY }, models }
+    : { type: PROVIDER, auth: { api_key: KEY }, models };
+  let r = await api("POST", "/settings/model-providers", { manifest });
+  // If the provider already exists, update it instead.
+  if (r.status === 409) {
+    r = await api("PUT", "/settings/model-providers", { manifest });
+    console.log(`model provider (${PROVIDER}) already existed; PUT update -> ${r.status}`);
+  } else {
+    console.log(`model provider (${PROVIDER}) -> ${r.status}`);
+  }
   if (r.status >= 400) console.log("  ", JSON.stringify(r.json));
   return r.status < 400;
 }
@@ -144,14 +152,24 @@ async function createAgent() {
         require_approval_for_tools: ["connect"],
       },
     ],
-    config: { sandbox: { enabled: ENABLE_SANDBOX } },
+    config: {
+      sandbox: { enabled: ENABLE_SANDBOX },
+      // Trim per-request context: the Crucible workflow doesn't need generative UI, the
+      // ask-user tool, or dynamic subagents. Disabling them keeps requests small (important on
+      // token-per-minute-limited tiers, e.g. Groq free) and the agent focused on the tools + gate.
+      generative_ui: { enabled: false },
+      ask_user_questions: { enabled: false },
+      dynamic_sub_agents: { enabled: false },
+    },
   };
-  const existing = await api("GET", "/agents/crucible-agent");
-  const r =
-    existing.status === 200
-      ? await api("PUT", "/agents/crucible-agent", manifest)
-      : await api("POST", "/agents", { name: "crucible-agent", manifest });
-  console.log(`agent ${existing.status === 200 ? "PUT" : "POST"} -> ${r.status}`);
+  // TrueForge GET /agents/:name returns 404; list all and find by name instead.
+  const listRes = await api("GET", "/agents");
+  const agents = Array.isArray(listRes.json?.data) ? listRes.json.data : [];
+  const existing = agents.find((a) => a.name === "crucible-agent");
+  const r = existing
+    ? await api("PUT", `/agents/${existing.id}`, { manifest })
+    : await api("POST", "/agents", { name: "crucible-agent", manifest });
+  console.log(`agent ${existing ? "PUT" : "POST"} -> ${r.status}`);
   if (r.status >= 400) {
     console.log("  ", JSON.stringify(r.json));
   } else {

@@ -40,6 +40,20 @@ node scripts/trueforge-setup.mjs
 TF_MODEL_API_KEY=sk-... MODEL_PROVIDER=openai MODEL_ID=gpt-5.5 MODEL_NAME=gpt-5-5 \
   node scripts/trueforge-setup.mjs
 ```
+
+**OpenAI-compatible providers (e.g. Groq).** Not native — set `MODEL_BASE_URL` to register the
+provider as `custom`; pick a model your key can access (`curl $MODEL_BASE_URL/models -H
+"Authorization: Bearer $KEY"`):
+```
+TF_MODEL_API_KEY=$GROQ_API_KEY MODEL_PROVIDER=groq \
+  MODEL_BASE_URL=https://api.groq.com/openai/v1 \
+  MODEL_ID=openai/gpt-oss-120b MODEL_NAME=gpt-oss-120b \
+  node scripts/trueforge-setup.mjs
+```
+> Mind the tier limits: Groq's **free tier is ~8000 tokens/min**, and this agent's request (system
+> prompt + tool schemas) is larger, so it 413s. Use Groq's **Dev tier** or a provider/key with
+> adequate TPM. Gemini free tier is `limit: 0` (needs billing). The setup script disables generative
+> UI / ask-user / subagents to keep requests lean, but the base agent context is still sizeable.
 This registers the `crucible` MCP connector (with the bearer token), and — **only when a model is
 configured** — creates the `crucible-agent` with `require_approval_for_tools: ["connect"]` (the
 **"License to Hack"** gate). Without a key it stops after the connector and tells you so.

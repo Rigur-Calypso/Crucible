@@ -420,3 +420,29 @@ BYO model key.
 Product complete on `main`. Open PRs to merge: `feature/readme-qodo-evidence` (Qodo evidence) and
 `feature/submission-materials` (write-up + shot-list). Remaining for submission: a Gemini key with
 quota → record the ~3-min demo; the write-up is drafted.
+
+---
+
+## 2026-08-27 (later) — Setup-script fixes + OpenAI-compatible (Groq) support
+
+### Actions
+- Folded in two correct upstream fixes to `scripts/trueforge-setup.mjs`: model-provider POST now
+  falls back to PUT on 409 (already exists); the agent is located by listing `/agents` and matching
+  by name, then PUT by id (GET /agents/:name 404s).
+- Added **OpenAI-compatible provider** support: `MODEL_BASE_URL` registers the provider as `custom`
+  (type/name/base_url/auth/models), so Groq etc. work. Agent FQN = `<PROVIDER>/<MODEL_NAME>`.
+- Trimmed agent config (`generative_ui`, `ask_user_questions`, `dynamic_sub_agents` = false) to keep
+  per-request context lean on token-per-minute-limited tiers.
+- Documented the Groq recipe + tier caveats in `.env.example` and `docs/TRUEFORGE_SETUP.md`.
+
+### Verification / finding
+- Groq wired via `custom` + `https://api.groq.com/openai/v1`: provider 201, agent 200 — reachable
+  (real 404 for a bad model id, then real 413 for TPM). Listed the key's available models; used
+  `openai/gpt-oss-120b`/`-20b`.
+- **Live run blocked by Groq free tier: 8000 TPM**, request ~17k tokens → 413. Not a Crucible bug.
+  Fix is external: Groq **Dev tier** (higher TPM), Gemini **billing** (free tier is `limit: 0`), or
+  a provider/key with adequate limits. The full path is proven up to the model's rate limit.
+
+### Current status
+Setup-script + Groq support on `feature/setup-groq-support`. `.env` (with Gemini/Groq keys) remains
+gitignored and untracked. Live demo still needs a model tier with enough TPM.

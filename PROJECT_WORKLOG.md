@@ -296,3 +296,53 @@ server (a genuine `[verify in impl]` for the harness milestone), tracked in
 ### Current status
 PR #2 updated on `feature/qodo-fixes-correctness`. Post the dismissal reason for finding #1 in its
 Qodo thread, let Qodo re-review the update, then merge.
+
+---
+
+## 2026-08-27 (later) — TrueForge integration wired & verified against v0.1.4
+
+### Objective
+Stand up the real TrueForge harness, learn its actual API (not assumptions), and wire the Crucible
+in: MCP connector, agent, approval gate, sandbox — resolving the last Qodo item (#3, arena DNS)
+and the D4a egress question.
+
+### Actions
+- Ran `npx @truefoundry/trueforge@0.1.4` (standalone, SQLite, API at `/api/v1`, OpenAPI at
+  `/api/v1/openapi.json`). Read the real schemas for MCP-server + agent creation.
+- **Key finding:** TrueForge registers only *remote* MCP servers by URL — not stdio. So:
+  - Added `mcp-server/src/http.ts` — Streamable HTTP transport (canonical stateful sessions).
+  - Added `mcp-server/Dockerfile` + `.dockerignore`; added a `mcp` service to
+    `arena/docker-compose.yml` on TWO networks: `arena` (internal, to reach web-01) and `edge`
+    (host-reachable, so TrueForge reaches `http://localhost:8848/mcp`). Resolves Qodo #3.
+  - Added `readOnlyHint` annotations to the 4 read tools (connect already `destructiveHint`) so
+    TrueForge's approval selectors (`@read-only`/`@destructive`) map correctly.
+- Added `scripts/trueforge-setup.mjs` (idempotent): registers the connector, optionally configures
+  a model provider from `TF_MODEL_API_KEY` (never committed), and creates `crucible-agent` with
+  `require_approval_for_tools: ["connect"]` + `config.sandbox.enabled`.
+- Added `docs/TRUEFORGE_SETUP.md`; updated `docs/TRUEFORGE_INTEGRATION.md` §10 (checklist now
+  confirmed against v0.1.4) and resolved **D4a** in `PROJECT_DECISIONS.md`.
+
+### Verification
+- Containerized MCP on the arena net: `connect('web-01',5000)` → **real socket, connected:true**
+  to 10.42.0.5. `8.8.8.8:443` and `web-01:22` → blocked, fail-closed. (End-to-end proof of
+  Qodo #1 + #3.)
+- TrueForge: `POST /settings/mcp-servers` → 201; `GET /mcp-servers/crucible/tools` lists all five
+  with annotations. `scripts/trueforge-setup.mjs` idempotent (connector PUT update → 200).
+- Agent creation returns 422 "provider not configured" until a model key is supplied — expected;
+  everything else (connector, tool grants, approval config, sandbox flag) validates.
+- `npm test`: 28/28 still green.
+
+### Failure / unexpected result
+- MCP server bound IPv6-only initially wasn't an issue; TrueForge binds `::1`, Docker publishes
+  IPv4 — registered the connector URL as `http://127.0.0.1:8848/mcp` to be explicit.
+- First upsert used `PUT /settings/mcp-servers/{name}` (404); PUT is list-level — fixed the script.
+
+### Current status
+TrueForge integration complete and verified except the live model run (needs BYO key). To finish:
+`TF_MODEL_API_KEY=... node scripts/trueforge-setup.mjs`, then run a Security Case in the chat UI
+and prove approval-denial blocks `connect`. Branch: `feature/trueforge-mcp-http-integration` (PR #3).
+
+### Known limitations
+- Agent sandbox's own egress lockdown (Layer 1 for agent-written code) still to constrain via the
+  sandbox provider config (`docs/TRUEFORGE_INTEGRATION.md` §10).
+- Approval "denied → not executed" proof and the full end-to-end Security Case need the model key.

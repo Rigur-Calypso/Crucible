@@ -59,6 +59,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
         "List available arena challenges (lightweight metadata only, to keep context lean). " +
         "Call this first. Read-only; no approval required.",
       inputSchema: {},
+      annotations: { readOnlyHint: true },
     },
     async () => jsonResult(listChallenges()),
   );
@@ -71,6 +72,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
         "Full description, connection info, and hints for one challenge. Read-only; no approval " +
         "required.",
       inputSchema: { challenge_id: z.string().min(1).describe("Challenge id, e.g. 'web-01'") },
+      annotations: { readOnlyHint: true },
     },
     async ({ challenge_id }) => {
       const result = getChallenge(challenge_id);
@@ -89,6 +91,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
         challenge_id: z.string().min(1).describe("Owning challenge id, e.g. 'web-01'"),
         filename: z.string().min(1).describe("File within the challenge's own directory"),
       },
+      annotations: { readOnlyHint: true },
     },
     async ({ challenge_id, filename }) => {
       const result = await readChallengeFile(challenge_id, filename);
@@ -107,6 +110,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
         challenge_id: z.string().min(1),
         flag: z.string().min(1).describe("The captured flag, e.g. 'crucible{...}'"),
       },
+      annotations: { readOnlyHint: true },
     },
     async ({ challenge_id, flag }) => {
       // A wrong-but-valid flag (correct:false, no reason) is a normal result, not an error.

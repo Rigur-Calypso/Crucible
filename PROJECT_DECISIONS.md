@@ -43,10 +43,16 @@ Because agent-written code runs in a sandbox with network access, an allowlist t
   as the single approval-gated chokepoint.
 The boundary **fails closed**. Detail + threat model: `docs/SECURITY_MODEL.md`.
 
-**D4a (open, finalize in impl):** whether target interaction is *exclusively* via `connect`
-(sandbox has no arena egress) or *primarily* sandbox-direct with `connect` as the gated path.
-Default: sandbox-direct **with Layer 1 locked down**, `connect` retained as the audited,
-approval-gated action. Revisit after inspecting the real Docker/TrueForge sandbox networking.
+**D4a (resolved 2026-08-27).** TrueForge registers only *remote* MCP servers (by URL), so the
+Crucible MCP server is served over Streamable HTTP and runs as a **container on two networks**:
+`arena` (internal, no egress) to reach targets, and `edge` (host-reachable) so TrueForge can reach
+its HTTP endpoint. Target interaction goes through **`connect`**, whose in-code allowlist (Layer 2)
+is the audited, approval-gated chokepoint; the MCP server is trusted enforcement code, so its
+host-reachability is fine. The remaining Layer-1 concern is the **agent sandbox's** own egress
+(agent-written code), constrained via the sandbox provider — tracked in
+`docs/TRUEFORGE_INTEGRATION.md` §10. Verified end-to-end: `connect('web-01',5000)` opens a real
+socket to 10.42.0.5 from the arena-attached MCP container; off-arena/bad-port destinations are
+rejected fail-closed.
 
 ## D5 — Network policy specifics
 Implemented and tested in `mcp-server/src/policy/networkPolicy.ts` +

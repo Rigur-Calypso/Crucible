@@ -29,6 +29,26 @@ services:
 
   # crypto-01 / forensics-01 go here later (secondary, optional).
 
+  # Crucible MCP server — the ONLY sanctioned path from the agent to the arena.
+  # It sits on TWO networks by design:
+  #   - `arena`  (internal, no egress): to reach web-01 by hostname/IP so `connect` works.
+  #   - `edge`   (normal bridge): so TrueForge on the host can reach its Streamable HTTP endpoint
+  #              (TrueForge registers only *remote* MCP servers via URL).
+  # This is safe: the MCP server is trusted enforcement code (Layer 2, the allowlist). The thing
+  # that must stay egress-contained is the agent's SANDBOX (Layer 1), not this server. `connect`
+  # still refuses any destination outside the arena subnet, in code, fail-closed.
+  mcp:
+    build: ../mcp-server
+    container_name: crucible-mcp
+    networks: [arena, edge]
+    ports: ["8848:8848"]        # http://localhost:8848/mcp — register this URL in TrueForge
+    environment:
+      CRUCIBLE_MCP_PORT: "8848"
+      CRUCIBLE_MCP_PATH: "/mcp"
+    depends_on:
+      web-01:
+        condition: service_healthy
+
 networks:
   arena:
     driver: bridge
@@ -36,3 +56,5 @@ networks:
     ipam:
       config:
         - subnet: 10.42.0.0/24
+  edge:
+    driver: bridge   # host-reachable; carries only the MCP HTTP endpoint to TrueForge

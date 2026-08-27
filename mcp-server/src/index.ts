@@ -1,14 +1,13 @@
 /**
  * Crucible MCP server entrypoint.
  *
- * Registers the five Crucible tools with the official MCP TypeScript SDK
- * (@modelcontextprotocol/sdk v1.30.x) and serves them over stdio — the transport TrueForge
- * spawns a stdio MCP connector with. Each tool has an explicit zod input schema; the tool
+ * Registers the six Crucible tools with the official MCP TypeScript SDK
+ * (@modelcontextprotocol/sdk v1.30.x). Each tool has an explicit zod input schema; the tool
  * bodies live in ./tools/* and are unit-tested independently of the transport.
  *
- * `connect` is the approval-gated boundary. Its allowlist is enforced in code in
- * ./policy/networkPolicy.ts (Layer 2); mark it approval-required on the TrueForge agent so the
- * human gate fires before it runs (see docs/TRUEFORGE_INTEGRATION.md §3).
+ * `connect` and `http_request` are the approval-gated live-target actions. Their allowlist is
+ * enforced in code in ./policy/networkPolicy.ts (Layer 2); mark BOTH approval-required on the
+ * TrueForge agent so the human gate fires before they run (see docs/TRUEFORGE_INTEGRATION.md §3).
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -20,9 +19,10 @@ import { getChallenge } from "./tools/getChallenge.ts";
 import { readChallengeFile } from "./tools/fetchFile.ts";
 import { submitFlag } from "./tools/submitFlag.ts";
 import { connect, type Connector } from "./tools/connect.ts";
+import { httpRequest, type HttpFetcher } from "./tools/httpRequest.ts";
 
 /** Pure tool functions, exported for reuse/tests independent of the MCP transport. */
-export const tools = { listChallenges, getChallenge, readChallengeFile, submitFlag, connect };
+export const tools = { listChallenges, getChallenge, readChallengeFile, submitFlag, connect, httpRequest };
 
 /**
  * Wrap a plain JSON result into an MCP tool result. The full JSON always travels in the text
@@ -46,6 +46,8 @@ function jsonResult(payload: unknown, isError = false) {
 export interface CreateServerOptions {
   /** Override the TCP connector used by `connect` (tests inject a deterministic one). */
   connector?: Connector;
+  /** Override the HTTP fetcher used by `http_request` (tests inject a deterministic one). */
+  fetcher?: HttpFetcher;
 }
 
 export function createServer(options: CreateServerOptions = {}): McpServer {
@@ -139,6 +141,39 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       const result = options.connector
         ? await connect({ host, port }, options.connector)
         : await connect({ host, port });
+      return jsonResult(result, result.ok === false);
+    },
+  );
+
+  server.registerTool(
+    "http_request",
+    {
+      title: "Send an HTTP request to a target (approval-gated)",
+      description:
+        "The live-target EXECUTION action: send a real HTTP request (e.g. POST /login with a " +
+        "SQL-injection payload) to an arena target and return the response, so you can confirm " +
+        "exploitability and capture the flag. Same allowlist as `connect` (Layer 2, fail-closed): " +
+        "non-arena hosts/ports are rejected. Mark this approval-required on the agent. " +
+        "Example body for the web-01 login bypass: `username=admin'--&password=x` " +
+        "(application/x-www-form-urlencoded).",
+      inputSchema: {
+        host: z.string().min(1).describe("Arena host or IP, e.g. 'web-01'"),
+        port: z.number().int().describe("Destination port, e.g. 5000"),
+        method: z.string().optional().describe("HTTP method (default GET); use POST for /login"),
+        path: z.string().optional().describe("Request path, e.g. '/login'"),
+        body: z.string().optional().describe("Request body, e.g. \"username=admin'--&password=x\""),
+        content_type: z
+          .string()
+          .optional()
+          .describe("Content-Type (default application/x-www-form-urlencoded)"),
+      },
+      annotations: { destructiveHint: true, openWorldHint: true },
+    },
+    async ({ host, port, method, path, body, content_type }) => {
+      const input = { host, port, method, path, body, content_type };
+      const result = options.fetcher
+        ? await httpRequest(input, options.fetcher)
+        : await httpRequest(input);
       return jsonResult(result, result.ok === false);
     },
   );

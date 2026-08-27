@@ -123,7 +123,7 @@ async function upsertConnector() {
     name: "crucible",
     url: MCP_URL,
     description:
-      "Crucible arena tools: list_challenges, get_challenge, fetch_file, submit_flag, connect (approval-gated).",
+      "Crucible arena tools: list_challenges, get_challenge, fetch_file, submit_flag, connect + http_request (approval-gated).",
   };
   if (MCP_TOKEN) {
     manifest.auth = { type: "header", headers: { Authorization: `Bearer ${MCP_TOKEN}` } };
@@ -180,8 +180,8 @@ async function createAgent() {
       {
         name: "crucible",
         enable_tools: ["@all"],
-        // The "License to Hack" gate: only `connect` (the live-target action) needs approval.
-        require_approval_for_tools: ["connect"],
+        // The "License to Hack" gate: the live-target actions (connect + http_request) need approval.
+        require_approval_for_tools: ["connect", "http_request"],
       },
     ],
     config: {

@@ -1,6 +1,6 @@
 # Crucible MCP Server
 
-The only sanctioned path from the agent to the self-owned arena. Exposes five tools to
+The only sanctioned path from the agent to the self-owned arena. Exposes six tools to
 TrueForge over MCP: `list_challenges`, `get_challenge`, `fetch_file`, `submit_flag`, `connect`.
 
 ## The security-critical part

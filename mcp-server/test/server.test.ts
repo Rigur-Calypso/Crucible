@@ -28,13 +28,35 @@ function textOf(result: unknown): string {
   return content?.[0]?.text ?? "";
 }
 
-test("registers exactly the five Crucible tools", async () => {
+test("registers exactly the six Crucible tools", async () => {
   const client = await connectedClient();
   const { tools } = await client.listTools();
   assert.deepEqual(
     tools.map((t) => t.name).sort(),
-    ["connect", "fetch_file", "get_challenge", "list_challenges", "submit_flag"],
+    ["connect", "fetch_file", "get_challenge", "http_request", "list_challenges", "submit_flag"],
   );
+  await client.close();
+});
+
+test("http_request over MCP: blocked destination is isError; arena request returns the flag", async () => {
+  const client = await connectedClient({
+    fetcher: async (a) =>
+      a.path === "/login"
+        ? { status: 200, body: '{"ok":true,"flag":"crucible{sqli_auth_bypass_web01}"}', truncated: false }
+        : { status: 404, body: "", truncated: false },
+  });
+  const blocked = await client.callTool({
+    name: "http_request",
+    arguments: { host: "8.8.8.8", port: 5000, method: "GET", path: "/" },
+  });
+  assert.equal(blocked.isError, true);
+
+  const exploit = await client.callTool({
+    name: "http_request",
+    arguments: { host: "10.42.0.5", port: 5000, method: "POST", path: "/login", body: "username=admin'--&password=x" },
+  });
+  assert.notEqual(exploit.isError, true);
+  assert.match(textOf(exploit), /crucible\{sqli_auth_bypass_web01\}/);
   await client.close();
 });
 

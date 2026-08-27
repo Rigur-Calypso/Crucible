@@ -78,5 +78,16 @@ else
   pass "egress to 8.8.8.8:443 blocked (no route out of the arena)"
 fi
 
+echo "== [4] http_request tool (production MCP path) =="
+# Exercise the approval-gated http_request tool over the real MCP endpoint: it should run the
+# login-bypass exploit and return the flag, and block a non-arena destination (fail-closed).
+CHECK="$HERE/../mcp-server/scripts/check-http-request.mjs"
+if command -v node >/dev/null 2>&1 && [ -d "$HERE/../mcp-server/node_modules/@modelcontextprotocol" ]; then
+  MCP_URL="${MCP_URL:-http://127.0.0.1:8848/mcp}" node "$CHECK" \
+    || fail "http_request tool check failed (see output above)"
+else
+  echo "  SKIP (node or mcp-server deps unavailable; run 'npm --prefix mcp-server install')"
+fi
+
 echo
 echo "All arena checks passed. (Stop the arena with: docker compose -f arena/docker-compose.yml down)"

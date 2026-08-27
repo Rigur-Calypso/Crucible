@@ -117,14 +117,14 @@ async function configureModel() {
     type: PROVIDER,
     auth: {
       api_key: KEY,
-      models: [
-        {
-          model_id: MODEL_ID,
-          name: MODEL_NAME,
-          properties: { context_length: 128000, max_output_tokens: 16000 },
-        },
-      ],
     },
+    models: [
+      {
+        model_id: MODEL_ID,
+        name: MODEL_NAME,
+        properties: { context_length: 128000, max_output_tokens: 16000 },
+      },
+    ],
   };
   const r = await api("POST", "/settings/model-providers", { manifest });
   console.log(`model provider (${PROVIDER}) -> ${r.status}`);

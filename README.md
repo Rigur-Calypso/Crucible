@@ -80,13 +80,41 @@ passes and both layers are proven.
 
 ## Qodo Code Review Evidence
 Every substantive change in this repo goes through a GitHub pull request reviewed by Qodo before
-merge; direct pushes to `main` are not used. Setup + per-PR workflow: `docs/QODO_SETUP.md`.
+merge; direct pushes to `main` are not used. Each PR shows an initial Qodo review, our fixes or
+recorded dismissals, and a follow-up review of the final code. Setup + per-PR workflow:
+`docs/QODO_SETUP.md`.
 
-- **Representative reviewed PR:** _TODO: link a merged PR containing meaningful hackathon code._
-- **What Qodo surfaced and what we did:** _TODO: 1–2 sentences on a real finding and the change
-  we made (or why we dismissed it, recorded in the Qodo thread)._
-- **Review trail:** _TODO: the PR history shows the initial review, our decisions, and a
-  follow-up review against the final code._
+**Representative reviewed PRs**
+- [PR #1 — Foundation](https://github.com/Rigur-Calypso/Crucible/pull/1) (merged): arena, MCP
+  server, two-layer security boundary.
+- [PR #2 — Address Qodo review](https://github.com/Rigur-Calypso/Crucible/pull/2) (merged):
+  correctness + robustness fixes.
+- [PR #3 — TrueForge integration](https://github.com/Rigur-Calypso/Crucible/pull/3) (merged): HTTP
+  MCP transport, containerized MCP on the arena network, agent + approval wiring.
+
+**What Qodo surfaced and what we did (examples)**
+- *Security (PR #3, High/Med).* Qodo flagged that the new Streamable-HTTP MCP endpoint was
+  published on all host interfaces, unauthenticated, with unbounded request bodies. We bound it to
+  **loopback only**, added **bearer-token auth** (sent via the connector's header auth), enabled
+  **DNS-rebinding Host validation**, and **capped body size (413)**. Its re-review went from
+  5 bugs + 5 rule-violations to **0 bugs**.
+- *Correctness (PR #1, High).* Qodo caught that `connect` reported success without opening a
+  socket. We made it perform **real TCP I/O to the pinned resolved IP** (anti-rebinding) and
+  report the true outcome — with tests for the reachable / unreachable / blocked paths.
+- *Access control (PR #2, Med).* Qodo noted `fetch_file` read any syntactically-valid challenge
+  directory without an ownership check. We now **authorize the challenge against the registry**
+  before any path is resolved.
+- *Dismissed with recorded reason (PR #2).* Qodo suggested an in-code approval gate inside the
+  `connect` tool. We **declined in-thread**: an MCP tool cannot hold trustworthy approval state
+  (the agent controls its inputs), so approval is enforced by TrueForge's harness-level gate,
+  outside the agent's control — while the network allowlist stays enforced in code.
+
+**Review trail**
+The PR history shows the full loop on each change — Qodo's initial review, our per-finding
+response (fix or justified dismissal in the thread), and a follow-up review against the pushed
+code. Every valid High was fixed; remaining items are Medium rule-violations that are either
+resolved or documented as needing the live TrueForge harness (e.g. end-to-end approval-denial),
+recorded in `PROJECT_WORKLOG.md`.
 
 ## AI-assisted development disclosure
 This project was built with AI coding assistance (Claude Code / Claude). AI tools were used for

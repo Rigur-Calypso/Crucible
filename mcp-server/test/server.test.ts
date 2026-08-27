@@ -13,9 +13,11 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../src/index.ts";
 
-async function connectedClient(): Promise<Client> {
+async function connectedClient(
+  options: Parameters<typeof createServer>[0] = {},
+): Promise<Client> {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createServer();
+  const server = createServer(options);
   const client = new Client({ name: "test", version: "0.0.0" });
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   return client;
@@ -66,11 +68,44 @@ test("connect FAILS CLOSED on a non-arena destination and flags an error", async
   await client.close();
 });
 
-test("connect allows an arena IP on a permitted port and pins the resolved IP", async () => {
-  const client = await connectedClient();
+test("connect: allowed + reachable → opens a real socket to the PINNED ip and succeeds", async () => {
+  const seen: Array<{ ip: string; port: number }> = [];
+  const client = await connectedClient({
+    connector: async (ip, port) => {
+      seen.push({ ip, port });
+    }, // resolves = connection succeeds
+  });
   const res = await client.callTool({ name: "connect", arguments: { host: "10.42.0.5", port: 5000 } });
   assert.notEqual(res.isError, true);
+  assert.match(textOf(res), /"connected": true/);
   assert.match(textOf(res), /"target": "10.42.0.5:5000"/);
+  assert.deepEqual(seen, [{ ip: "10.42.0.5", port: 5000 }]); // connected to the pinned IP
+  await client.close();
+});
+
+test("connect: allowed but UNREACHABLE → honest failure, not a false success", async () => {
+  const client = await connectedClient({
+    connector: async () => {
+      throw new Error("ECONNREFUSED");
+    },
+  });
+  const res = await client.callTool({ name: "connect", arguments: { host: "10.42.0.5", port: 5000 } });
+  assert.equal(res.isError, true);
+  assert.match(textOf(res), /connection failed/);
+  await client.close();
+});
+
+test("connect: a BLOCKED destination never invokes the connector", async () => {
+  let called = false;
+  const client = await connectedClient({
+    connector: async () => {
+      called = true;
+    },
+  });
+  const res = await client.callTool({ name: "connect", arguments: { host: "8.8.8.8", port: 5000 } });
+  assert.equal(res.isError, true);
+  assert.match(textOf(res), /outside the arena subnet/);
+  assert.equal(called, false); // policy denial short-circuits before any I/O
   await client.close();
 });
 

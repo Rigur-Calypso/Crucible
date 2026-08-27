@@ -19,7 +19,7 @@ import { listChallenges } from "./tools/listChallenges.ts";
 import { getChallenge } from "./tools/getChallenge.ts";
 import { readChallengeFile } from "./tools/fetchFile.ts";
 import { submitFlag } from "./tools/submitFlag.ts";
-import { connect } from "./tools/connect.ts";
+import { connect, type Connector } from "./tools/connect.ts";
 
 /** Pure tool functions, exported for reuse/tests independent of the MCP transport. */
 export const tools = { listChallenges, getChallenge, readChallengeFile, submitFlag, connect };
@@ -43,7 +43,12 @@ function jsonResult(payload: unknown, isError = false) {
   return isError ? { ...base, isError: true } : base;
 }
 
-export function createServer(): McpServer {
+export interface CreateServerOptions {
+  /** Override the TCP connector used by `connect` (tests inject a deterministic one). */
+  connector?: Connector;
+}
+
+export function createServer(options: CreateServerOptions = {}): McpServer {
   const server = new McpServer({ name: "crucible-mcp-server", version: "0.1.0" });
 
   server.registerTool(
@@ -127,7 +132,9 @@ export function createServer(): McpServer {
       annotations: { destructiveHint: true, openWorldHint: true },
     },
     async ({ host, port }) => {
-      const result = await connect({ host, port });
+      const result = options.connector
+        ? await connect({ host, port }, options.connector)
+        : await connect({ host, port });
       return jsonResult(result, result.ok === false);
     },
   );

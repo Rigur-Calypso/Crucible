@@ -233,12 +233,12 @@ socket hand-off through the sandbox, and confirm the sandbox attaches only to th
 
 ### Objective
 PR #1 was reviewed by Qodo and merged to `main`. Qodo raised 6 findings (1 High, 5 Medium).
-Address the correctness/robustness subset that needs no infra change (findings #2, #4, #5, #6)
-in PR #2; defer the architectural pair (#1 `connect` I/O, #3 arena DNS) to PR #3
-(containerize the MCP server onto the arena network).
+Address the correctness/robustness findings that can be fixed and tested in code now
+(#1 real `connect` I/O, #2, #4, #5, #6) in PR #2; defer only #3 (arena DNS) — the deployment
+question of attaching the MCP server to the arena network, which depends on the TrueForge harness.
 
 ### Qodo findings (PR #1)
-1. **[High]** `connect` returns ok without opening a socket — deferred to PR #3.
+1. **[High]** `connect` returned ok without opening a socket — **fixed here** (real TCP I/O).
 2. **[Med]** `fetch_file` returned a path, not content — **fixed here**.
 3. **[Med]** Arena hostname can't resolve (MCP runs on host, not on the arena net) — PR #3.
 4. **[Med]** Tool failures didn't set MCP `isError` — **fixed here**.
@@ -246,6 +246,10 @@ in PR #2; defer the architectural pair (#1 `connect` I/O, #3 arena DNS) to PR #3
 6. **[Med]** Verifier hard-coded the Compose network name — **fixed here**.
 
 ### Actions
+- `connect.ts`: now performs **real TCP I/O** to the pinned resolved IP after the policy check
+  (injectable connector, bounded timeout), reporting `connected: true/false` — no more false
+  success. Blocked destinations never touch the network. Added real-socket tests
+  (`test/connect.test.ts`) + injected-connector branch tests.
 - `fetchFile.ts`: added `readChallengeFile` — resolve (containment) + **symlink-escape guard** +
   real read, returning base64 content; served from a dedicated agent-facing artifact root
   (`mcp-server/challenge-files/`), never the arena container source (so the flag isn't reachable
@@ -258,11 +262,14 @@ in PR #2; defer the architectural pair (#1 `connect` I/O, #3 arena DNS) to PR #3
 - Updated SECURITY_MODEL §5/§6 (fetch_file now implemented + symlink guard + tests).
 
 ### Verification
-- `npm run typecheck` clean; `npm test`: **23/23** (added fetch_file read + isError coverage).
+- `npm run typecheck` clean; `npm test`: **27/27** (added real `connect` I/O branch tests,
+  real-socket open/refuse tests, and fetch_file read + isError coverage).
 - `bash arena/verify-arena.sh`: **7/7**, healthcheck gates startup ("Waiting → Healthy"),
   network name derived correctly.
 
 ### Current status
-PR #2 ready on `feature/qodo-fixes-correctness`. Next: PR #3 — containerize the MCP server,
-attach it to the internal arena network, and make `connect` open a real socket to the pinned IP
-(resolves Qodo #1 and #3 together).
+PR #2 ready on `feature/qodo-fixes-correctness` — addresses 5 of the 6 Qodo findings (#1, #2, #4,
+#5, #6). Only #3 remains: attach the MCP server to the internal arena network so `connect` reaches
+arena hostnames — a deployment step that depends on how TrueForge launches/connects to the MCP
+server (a genuine `[verify in impl]` for the harness milestone), tracked in
+`docs/TRUEFORGE_INTEGRATION.md` §10.

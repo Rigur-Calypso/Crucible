@@ -226,3 +226,73 @@ https://github.com/Rigur-Calypso/Crucible/pull/new/feature/project-foundation
 Arena verified on real Docker with Layer-1 containment proven. Next (needs the running harness):
 `npx @truefoundry/trueforge`, add the MCP connector, mark `connect` approval-required, wire its
 socket hand-off through the sandbox, and confirm the sandbox attaches only to the arena network.
+
+---
+
+## 2026-08-27 — PR #1 merged; addressing Qodo's review (PR #2)
+
+### Objective
+PR #1 was reviewed by Qodo and merged to `main`. Qodo raised 6 findings (1 High, 5 Medium).
+Address the correctness/robustness findings that can be fixed and tested in code now
+(#1 real `connect` I/O, #2, #4, #5, #6) in PR #2; defer only #3 (arena DNS) — the deployment
+question of attaching the MCP server to the arena network, which depends on the TrueForge harness.
+
+### Qodo findings (PR #1)
+1. **[High]** `connect` returned ok without opening a socket — **fixed here** (real TCP I/O).
+2. **[Med]** `fetch_file` returned a path, not content — **fixed here**.
+3. **[Med]** Arena hostname can't resolve (MCP runs on host, not on the arena net) — PR #3.
+4. **[Med]** Tool failures didn't set MCP `isError` — **fixed here**.
+5. **[Med]** Verifier raced service startup (no healthcheck/readiness) — **fixed here**.
+6. **[Med]** Verifier hard-coded the Compose network name — **fixed here**.
+
+### Actions
+- `connect.ts`: now performs **real TCP I/O** to the pinned resolved IP after the policy check
+  (injectable connector, bounded timeout), reporting `connected: true/false` — no more false
+  success. Blocked destinations never touch the network. Added real-socket tests
+  (`test/connect.test.ts`) + injected-connector branch tests.
+- `fetchFile.ts`: added `readChallengeFile` — resolve (containment) + **symlink-escape guard** +
+  real read, returning base64 content; served from a dedicated agent-facing artifact root
+  (`mcp-server/challenge-files/`), never the arena container source (so the flag isn't reachable
+  via this tool). Added `challenge-files/web-01/briefing.txt`.
+- `index.ts`: every tool now sets MCP `isError` on a failed domain result (get_challenge unknown,
+  fetch_file failure, submit_flag unprocessable). A wrong-but-valid flag stays a normal result.
+- `docker-compose.yml`: added a python-based healthcheck to web-01.
+- `verify-arena.sh`: `up -d --wait` (blocks on healthy), network name **derived** from the
+  running container (robust to project-name overrides), and a bounded readiness retry.
+- Updated SECURITY_MODEL §5/§6 (fetch_file now implemented + symlink guard + tests).
+
+### Verification
+- `npm run typecheck` clean; `npm test`: **27/27** (added real `connect` I/O branch tests,
+  real-socket open/refuse tests, and fetch_file read + isError coverage).
+- `bash arena/verify-arena.sh`: **7/7**, healthcheck gates startup ("Waiting → Healthy"),
+  network name derived correctly.
+
+### Current status
+PR #2 ready on `feature/qodo-fixes-correctness` — addresses 5 of the 6 Qodo findings (#1, #2, #4,
+#5, #6). Only #3 remains: attach the MCP server to the internal arena network so `connect` reaches
+arena hostnames — a deployment step that depends on how TrueForge launches/connects to the MCP
+server (a genuine `[verify in impl]` for the harness milestone), tracked in
+`docs/TRUEFORGE_INTEGRATION.md` §10.
+
+---
+
+## 2026-08-27 (later) — Qodo re-review of PR #2 (3 Medium rule-violations)
+
+### Qodo findings on PR #2 (0 bugs, 3 rule violations, all Medium; Qodo endorsed the connect approach)
+1. **connect has no in-code approval gate** before the live socket — **dismissed with reason**:
+   an MCP tool cannot obtain trustworthy approval state (the agent controls tool inputs), so an
+   in-code gate would be theatre. Approval is enforced by TrueForge's harness-level gate, which
+   intercepts the call outside the agent's control (D7/D14). The denied-action-does-not-execute
+   test is tracked in the TrueForge milestone (`docs/TRUEFORGE_INTEGRATION.md` §10).
+2. **fetch_file lacked an ownership check** — **fixed**: `readChallengeFile` now authorizes the
+   challenge against the registry (`isKnownChallenge`) before resolving/reading; unknown ids fail
+   closed. Matches PRD D6 ("ownership check"). Added `isKnownChallenge`/`knownChallengeIds`.
+3. **CRUCIBLE_CHALLENGE_FILES_ROOT undocumented** — **fixed**: added to `.env.example` with a
+   non-secret placeholder and explanation.
+
+### Verification
+- `npm run typecheck` clean; `npm test`: **28/28** (added an ownership-check test).
+
+### Current status
+PR #2 updated on `feature/qodo-fixes-correctness`. Post the dismissal reason for finding #1 in its
+Qodo thread, let Qodo re-review the update, then merge.

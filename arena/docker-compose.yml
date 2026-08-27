@@ -15,6 +15,14 @@ services:
     networks:
       arena:
         ipv4_address: 10.42.0.5
+    # Readiness: lets `docker compose up --wait` block until Flask is actually serving, so the
+    # verifier never races service startup. Uses python (already in the image) — no curl needed.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:5000/challenge.json', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
     # No host port publishing by default: reachable only on the internal arena network.
     # Uncomment ONLY for local dev if you must hit it from the host:
     # ports: ["5000:5000"]

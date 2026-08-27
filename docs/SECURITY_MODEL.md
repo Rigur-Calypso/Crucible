@@ -59,7 +59,10 @@ it rather than re-resolving (anti-rebinding).
 ## 5. Filesystem policy (`fetch_file`)
 Serves only files belonging to the named challenge. Rejects path traversal (`../`, absolute paths,
 encoded separators, symlink escapes) and never performs an arbitrary read. Ownership checked before
-any path is touched. Sketch in `../mcp-server/src/tools/fetchFile.ts`; fails closed.
+any path is touched. Implemented in `../mcp-server/src/tools/fetchFile.ts`: containment check
+(no I/O) + a **symlink-escape guard** (real path must stay inside the challenge dir) before the
+read; served only from a dedicated agent-facing artifact root, never the arena container source
+(so the target's solution/flag is not reachable via this tool). Fails closed.
 
 ## 6. Fail-closed test matrix (boundary not "done" until these pass)
 Implemented cases in `networkPolicy.test.ts` (✓ = passing today):
@@ -76,11 +79,12 @@ returns the flag. This is the network-level containment counterpart to the in-co
 All 7 checks pass today. The remaining `[verify in impl]` is confirming the **TrueForge sandbox**
 attaches to (only) this same internal network so it inherits the containment.
 
-**Partly covered:** a `fetch_file` path-traversal rejection is asserted at the MCP layer in
-`server.test.ts`; the exhaustive traversal matrix (encoded separators, absolute paths, symlink
-escape) is still to add against `fetchFile.ts` directly.
+**`fetch_file` — covered.** `server.test.ts` asserts traversal rejection (with `isError`),
+missing-file failure (`isError`), and a successful real read of a challenge artifact; the code
+also enforces a symlink-escape guard. The exhaustive traversal matrix (encoded separators,
+absolute paths) against `fetchFile.ts` directly is still worth expanding.
 **Still to add (impl):** DNS-rebinding time-of-check/use at the `connect` socket; the exhaustive
-`fetch_file` traversal matrix and symlink-escape check; and unauthorized-challenge-access tests.
+`fetch_file` traversal matrix; and unauthorized-challenge-access tests.
 
 ## 7. Secrets
 No keys/tokens/passwords/credentials/`.env`/personal data in the repo, ever. `.env.example` +

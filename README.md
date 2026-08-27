@@ -11,7 +11,7 @@ flag as evidence, and produces a **security finding**.*
 ![tests](https://img.shields.io/badge/tests-40%2F40-brightgreen)
 ![arena checks](https://img.shields.io/badge/arena%20checks-9%2F9-brightgreen)
 ![security](https://img.shields.io/badge/network%20boundary-fail--closed-critical)
-![Qodo](https://img.shields.io/badge/Qodo-8%20reviewed%20PRs-blue)
+![Qodo](https://img.shields.io/badge/Qodo-10%20reviewed%20PRs-blue)
 ![TrueForge](https://img.shields.io/badge/TrueForge-load--bearing-8A2BE2)
 ![license](https://img.shields.io/badge/targets-self--owned%20only-lightgrey)
 
@@ -34,10 +34,11 @@ dangerous action stays inside **enforceable technical and human boundaries**:
   an in-code allowlist) that no prompt can talk its way around. **9/9 arena checks, 40/40 tests.**
 - 🎯 **Real result** — it lands the SQL-injection auth bypass on `web-01`, captures
   `crucible{…}`, validates it server-side, and emits a structured **security finding** — not "flag found."
-- ✅ **Every change Qodo-reviewed** across 8 PRs; direct pushes to `main` are never used.
+- ✅ **Every change Qodo-reviewed** across 10 PRs; direct pushes to `main` are never used.
 
 > **Remove TrueForge and the architecture collapses:** the harness *is* the agent loop, the MCP tool
-> routing, the sandbox, and — critically — the human-approval gate.
+> routing, and — critically — the human-approval gate. (Its sandbox-as-tool is available too; we keep
+> it off by default — see the security model — and route every live action through allowlisted tools.)
 
 ---
 
@@ -104,7 +105,7 @@ flowchart LR
 | **Potential impact** | Autonomous vulnerability triage/validation is real, valuable security work (bug-bounty triage, pre-prod validation, security education) — not a toy. |
 | **Creativity / originality** | A safety-first *security-validation agent* — a distinctive, high-signal domain, not another chatbot/dashboard. |
 | **Technical excellence** | Custom MCP server (6 zod-typed tools), Streamable-HTTP transport, defense-in-depth network containment with anti-DNS-rebinding, server-side flag validation — **40 tests + 9 arena checks**. |
-| **Use of sponsor tools** | **TrueForge is load-bearing** — MCP routing, sandbox-as-tool, and the human-approval gate; remove it and the safety model collapses. **Qodo** reviewed all 8 PRs. |
+| **Use of sponsor tools** | **TrueForge is load-bearing** — MCP routing and the human-approval gate (sandbox-as-tool available, off by default for containment); remove it and the safety model collapses. **Qodo** reviewed all 10 PRs. |
 | **Control & safety** | The whole premise is safety-critical (an LLM runs exploit code). The approval gate + code-enforced, fail-closed boundary are **real, tested controls** — not disclaimers. |
 | **Presentation** | The approval pause, a live controlled exploit, and a network-boundary **rejection** are inherently dramatic and on-theme with the "License to act / 007" framing. |
 
@@ -135,7 +136,8 @@ behaves. That boundary is the product.
 | Stop before irreversible action | **Human approval** | Pause before `connect` / `http_request` (the "License to Hack") |
 | Safe place to run generated code | Sandbox-as-tool | Available; off by default (standalone can't lock sandbox egress — see §3a) |
 | Any model | Model providers | BYO key; free-tier `gemini-3.5-flash-lite`; OpenAI-compatible (Groq) supported |
-| Survive reconnects / delegate | Sessions / subagents | A Security Case is a persisted session; subagents available |
+| Survive reconnects | Sessions | A Security Case is a persisted TrueForge session |
+| Delegate (optional) | Subagents | A harness capability; **not wired up** here (design recorded in `PROJECT_DECISIONS.md` D17, currently disabled) |
 
 Full detail: [`docs/TRUEFORGE_INTEGRATION.md`](docs/TRUEFORGE_INTEGRATION.md).
 

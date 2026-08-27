@@ -61,9 +61,16 @@ configured** — creates the `crucible-agent` with `require_approval_for_tools: 
 The API key and the MCP token are read from the environment only — **never committed**.
 
 > **Sandbox is OFF by default.** In standalone mode TrueForge can't confine sandbox egress to the
-> arena, so agent-written code could bypass `connect`. With the sandbox off, all target interaction
-> flows through the allowlisted, approval-gated `connect`. Opt in only against the self-owned arena
-> with `CRUCIBLE_ENABLE_SANDBOX=true`. See `SECURITY_MODEL.md` §3a.
+> arena, so agent-written code could reach outside it. With the sandbox off, all target interaction
+> flows through the allowlisted, approval-gated tools. See `SECURITY_MODEL.md` §3a.
+>
+> **Demo profile (optional):** set `CRUCIBLE_ENABLE_SANDBOX=true` before running
+> `scripts/trueforge-setup.mjs` to add a "code running in the sandbox" beat — the agent writes and
+> runs a local PoC dry-run in the sandbox before the approval gate. The approval gate still holds
+> even for tool calls made from the sandbox (verified — see `TRUEFORGE_INTEGRATION.md` §3). In
+> standalone mode the sandbox falls back to **local host execution** (not true isolation); use it
+> only against the self-owned arena, or configure a Daytona provider. See
+> `docs/DEMO_SHOTLIST.md` → "Optional beat".
 
 ## 4. Run a Security Case
 Open the chat UI at `http://localhost:8790`, pick `crucible-agent`, and give it the assignment:

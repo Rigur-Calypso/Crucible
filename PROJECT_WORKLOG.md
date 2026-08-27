@@ -446,3 +446,16 @@ quota → record the ~3-min demo; the write-up is drafted.
 ### Current status
 Setup-script + Groq support on `feature/setup-groq-support`. `.env` (with Gemini/Groq keys) remains
 gitignored and untracked. Live demo still needs a model tier with enough TPM.
+
+---
+
+## 2026-08-27 (later) — Qodo review of PR #6 (setup-groq-support)
+
+Qodo: 0 bugs, 2 Medium rule violations. Both addressed:
+- **MODEL_BASE_URL allows external hosts** — the model provider endpoint is intentionally an
+  external cloud API (not an arena target, never arena-constrained), but we now require it to be
+  **https** (`assertModelBaseUrl`) so the key/prompts can't go over plaintext or to internal infra.
+- **Custom provider lacks E2E tests** — extracted `buildModelManifest` + `assertModelBaseUrl` as
+  pure exported helpers and added `mcp-server/test/setup-manifest.test.ts` (native vs custom/Groq
+  manifest shapes; https-only validation). Guarded `main()` behind an import.meta check so the
+  script is importable without side effects. Full suite 34/34.

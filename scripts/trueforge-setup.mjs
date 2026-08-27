@@ -56,6 +56,40 @@ function assertLoopback(label, value) {
   }
 }
 
+/**
+ * The model provider endpoint (Groq/OpenAI/etc.) is intentionally an EXTERNAL cloud API — it is
+ * NOT an arena target and is never subject to the arena allowlist. But it must be https so the API
+ * key and prompts are never sent in plaintext or smuggled to internal infra over http.
+ */
+export function assertModelBaseUrl(value) {
+  let u;
+  try {
+    u = new URL(value);
+  } catch {
+    throw new Error(`MODEL_BASE_URL is not a valid URL: ${value}`);
+  }
+  if (u.protocol !== "https:") {
+    throw new Error(
+      `MODEL_BASE_URL must be an https:// endpoint (got "${u.protocol}//"). The model provider is ` +
+        `an external cloud API; never send the key over plaintext or to internal infra.`,
+    );
+  }
+}
+
+/**
+ * Pure builder for the TrueForge model-provider manifest. OpenAI-compatible providers (baseUrl set)
+ * register as `custom` (type/name/base_url/auth/models); native providers omit base_url. Exported
+ * so the shape is unit-testable without touching the live API.
+ */
+export function buildModelManifest({ provider, key, modelId, modelName, baseUrl }) {
+  const models = [
+    { model_id: modelId, name: modelName, properties: { context_length: 128000, max_output_tokens: 16000 } },
+  ];
+  return baseUrl
+    ? { type: "custom", name: provider, base_url: baseUrl, auth: { api_key: key }, models }
+    : { type: provider, auth: { api_key: key }, models };
+}
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 function loadSystemPrompt() {
   const raw = readFileSync(path.resolve(HERE, "../agent/system-prompt.md"), "utf8");
@@ -114,20 +148,18 @@ async function configureModel() {
     console.log("model provider: SKIPPED (set TF_MODEL_API_KEY to configure a runnable model).");
     return false;
   }
-  const models = [
-    {
-      model_id: MODEL_ID,
-      name: MODEL_NAME,
-      properties: { context_length: 128000, max_output_tokens: 16000 },
-    },
-  ];
   // OpenAI-compatible providers (e.g. Groq) aren't native types — register them as `custom`
   // with a base_url. Set MODEL_BASE_URL to switch into that mode; PROVIDER becomes the custom
   // provider's name, so the agent references `${PROVIDER}/${MODEL_NAME}`.
   const BASE_URL = process.env.MODEL_BASE_URL;
-  const manifest = BASE_URL
-    ? { type: "custom", name: PROVIDER, base_url: BASE_URL, auth: { api_key: KEY }, models }
-    : { type: PROVIDER, auth: { api_key: KEY }, models };
+  if (BASE_URL) assertModelBaseUrl(BASE_URL);
+  const manifest = buildModelManifest({
+    provider: PROVIDER,
+    key: KEY,
+    modelId: MODEL_ID,
+    modelName: MODEL_NAME,
+    baseUrl: BASE_URL,
+  });
   let r = await api("POST", "/settings/model-providers", { manifest });
   // If the provider already exists, update it instead.
   if (r.status === 409) {
@@ -196,7 +228,10 @@ async function main() {
   await createAgent();
 }
 
-main().catch((e) => {
-  console.error("setup failed:", e.message ?? e);
-  process.exit(1);
-});
+// Run only when invoked directly (not when imported by tests).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((e) => {
+    console.error("setup failed:", e.message ?? e);
+    process.exit(1);
+  });
+}

@@ -45,9 +45,10 @@ technical and human boundaries. That boundary *is* the product.
   **off by default**: standalone TrueForge doesn't expose a sandbox egress allowlist, so with the
   sandbox off *all* target interaction flows through the allowlisted, approval-gated `connect` / `http_request`
   (an honest, safer default we document explicitly).
-- **Sessions, subagents, skills, any model.** A Security Case is a TrueForge session (persisted,
-  survives reconnects); subagents and skills are available for function-split delegation; the model
-  is BYO (any provider). The agent loop, tool routing, and approvals are all the harness's.
+- **Sessions & any model.** A Security Case is a persisted TrueForge session that survives
+  reconnects; the model is BYO (any provider). Subagents and Skills are harness capabilities we
+  deliberately did **not** wire up (kept the single-agent path reliable — decision D17); we don't
+  claim them. The agent loop, tool routing, and approvals are all the harness's.
 
 ## The security model (enforced in code, fails closed)
 

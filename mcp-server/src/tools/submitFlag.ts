@@ -11,6 +11,8 @@ import crypto from "node:crypto";
  */
 const FLAGS: Record<string, string> = {
   "web-01": "crucible{sqli_auth_bypass_web01}",
+  // crypto-01: recovered by brute-forcing the single-byte-XOR cipher.bin (see challenge-files).
+  "crypto-01": "crucible{xor_is_not_encryption_c01}",
 };
 
 export interface FlagResult {

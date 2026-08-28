@@ -27,6 +27,23 @@ services:
     # Uncomment ONLY for local dev if you must hit it from the host:
     # ports: ["5000:5000"]
 
+  # web-01-patched — the PATCHED control twin of web-01 (parameterized query; SQLi closed).
+  # Same arena subnet + port as web-01, so it is reachable through the SAME allowlisted,
+  # approval-gated MCP path with NO policy change (10.42.0.6 ∈ 10.42.0.0/24, port 5000 allowed).
+  # Used by arena/verify-differential.sh to prove the exploit fails here (validator, not matcher).
+  web-01-patched:
+    build: ./web-01-patched
+    container_name: crucible-web-01-patched
+    networks:
+      arena:
+        ipv4_address: 10.42.0.6
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:5000/challenge.json', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
+
   # crypto-01 / forensics-01 go here later (secondary, optional).
 
   # Crucible MCP server — the ONLY sanctioned path from the agent to the arena.

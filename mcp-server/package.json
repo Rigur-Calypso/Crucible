@@ -8,7 +8,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "tsx --test test/*.test.ts",
     "start": "node --import tsx src/index.ts",
-    "start:http": "node --import tsx src/http.ts"
+    "start:http": "node --import tsx src/http.ts",
+    "emit:finding": "node --import tsx src/finding/emit.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

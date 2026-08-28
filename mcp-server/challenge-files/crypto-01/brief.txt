@@ -1,0 +1,12 @@
+crypto-01 — "XOR is not encryption"
+
+Artifact: cipher.bin (fetch it with fetch_file: challenge_id="crypto-01", filename="cipher.bin").
+fetch_file returns the bytes base64-encoded; decode to get the raw ciphertext.
+
+The plaintext was obfuscated with SINGLE-BYTE XOR: every byte was XORed with one unknown key
+byte (0x00–0xFF). Recover the flag by trying all 256 keys and picking the decode that yields
+printable ASCII of the form crucible{...}. Submit it with submit_flag (challenge_id="crypto-01").
+
+This is a static-analysis challenge: it resolves entirely through fetch_file + local reasoning.
+There is no live target and no network action — connect / http_request are not involved, so no
+human approval gate is triggered. It exists to show the investigation loop generalizes beyond web.

@@ -8,12 +8,14 @@
 asks a human to authorize** the one action that touches the live target — executes it, captures the
 flag as evidence, and produces a **security finding**.*
 
+[![CI](https://github.com/Rigur-Calypso/Crucible/actions/workflows/ci.yml/badge.svg)](https://github.com/Rigur-Calypso/Crucible/actions/workflows/ci.yml)
 ![tests](https://img.shields.io/badge/tests-40%2F40-brightgreen)
 ![arena checks](https://img.shields.io/badge/arena%20checks-9%2F9-brightgreen)
 ![security](https://img.shields.io/badge/network%20boundary-fail--closed-critical)
 ![Qodo](https://img.shields.io/badge/Qodo-10%20reviewed%20PRs-blue)
 ![TrueForge](https://img.shields.io/badge/TrueForge-load--bearing-8A2BE2)
-![license](https://img.shields.io/badge/targets-self--owned%20only-lightgrey)
+![license](https://img.shields.io/badge/license-Apache--2.0-blue)
+![targets](https://img.shields.io/badge/targets-self--owned%20only-lightgrey)
 
 **The Agent Harness Hackathon** · WeMakeDevs × TrueFoundry × Qodo × OpenAI · Track: **Best Use of TrueForge**
 

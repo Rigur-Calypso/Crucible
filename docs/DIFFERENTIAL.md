@@ -31,6 +31,26 @@ approval-gated MCP path (`connect` / `http_request`) with **zero** change to
 [`networkPolicy.ts`](../mcp-server/src/policy/networkPolicy.ts) — the Layer-2 boundary already covers
 it. The patched twin is just another self-owned arena target.
 
+## Two levels of proof
+
+`verify-differential.sh` proves the divergence at two levels, so the "validates, not pattern-matches"
+claim is backed by the real Crucible path — not only a direct request:
+
+1. **Target level `[1]–[3]`** — the identical payload is issued **arena-locally**: from *inside* the
+   arena, using the arena's own `web-01` image (which ships Python) via `docker exec`, over the
+   internal network. No external image is pulled and no traffic leaves the arena. This deterministically
+   shows the two *targets* behave differently.
+2. **Crucible path `[4]`** — the same divergence is confirmed through the **production `http_request`
+   MCP tool** (MCP → policy → HTTP), via
+   [`check-patched-mcp.mjs`](../mcp-server/scripts/check-patched-mcp.mjs): the flag is returned for
+   `web-01` and **not** for `web-01-patched`, through the exact policy-enforced tool the agent uses.
+   This is what makes it a statement about *The Crucible*, not just the targets.
+
+**On the human approval gate:** it is a **TrueForge-side** control, upstream of the MCP endpoint (see
+[SECURITY_MODEL.md](SECURITY_MODEL.md)). This verifier is *pre-flight infrastructure validation* — it
+exercises the tool + policy path and does **not** claim to exercise the human gate. (Same posture as
+[`verify-arena.sh`](../arena/verify-arena.sh) §4.)
+
 ## Run it
 
 ```bash
@@ -38,6 +58,8 @@ bash arena/verify-differential.sh
 ```
 
 Expected: the identical injection is **EXPLOITABLE** on `web-01` and **NOT exploitable** on
-`web-01-patched` (`401`, no flag), plus controls confirming wrong creds are rejected and legitimate
-credentials still authenticate on the patched twin. This is the deterministic, on-camera companion to
-a full agent run, and the safest way to show the "reports NOT exploitable" beat in a demo.
+`web-01-patched` (`401`, no flag) — at the target level and again through the `http_request` MCP tool
+— plus controls confirming wrong creds are rejected and legitimate credentials still authenticate on
+the patched twin. Section `[4]` SKIPs (and fails under CI) if node / mcp-server deps or the MCP
+endpoint are unavailable, rather than claiming a proof it did not run. This is the deterministic,
+on-camera companion to a full agent run, and the safest way to show the "reports NOT exploitable" beat.

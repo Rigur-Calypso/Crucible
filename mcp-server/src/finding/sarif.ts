@@ -6,10 +6,14 @@
  * GitHub code scanning ingests — makes the "real security tooling, not a CTF game" claim concrete:
  * the output drops straight into the same pipelines a human security tool would feed.
  *
- * This module is pure and dependency-free (trivially testable). It does NOT decide whether a
- * vulnerability exists — it serializes a finding the agent already validated end-to-end (the flag
- * capture is the confirmation). `submit_flag` remains the server-side source of truth for capture.
+ * This module is pure (trivially testable) and deterministic: it never reads the clock — a caller
+ * that wants "now" passes it in. It does NOT decide whether a vulnerability exists — it serializes a
+ * finding the agent already validated end-to-end (the flag capture is the confirmation).
+ * `submit_flag` remains the server-side source of truth for capture.
  */
+
+import { createHash } from "node:crypto";
+import { z } from "zod";
 
 export type Severity = "critical" | "high" | "medium" | "low";
 
@@ -28,14 +32,49 @@ export interface CrucibleFinding {
   cwe: number;
   /** The endpoint the finding concerns, e.g. "http://web-01:5000/login". */
   target: string;
+  /**
+   * Optional repo-relative source path of the root-cause code, e.g. "arena/web-01/app.py". When
+   * present it becomes the SARIF physicalLocation so GitHub code scanning can anchor the alert to a
+   * file. When absent, only a logicalLocation is emitted (no http physicalLocation, which GitHub
+   * relativizes against the checkout and would reject).
+   */
+  sourceFile?: string;
+  /** 1-based line within sourceFile of the root-cause code. */
+  sourceLine?: number;
   /** True when validated end-to-end (the flag was captured through the live target). */
   confirmed: boolean;
   /** Human-readable evidence: the payload used and the captured proof. */
   evidence: string;
   /** Recommended fix. */
   remediation: string;
-  /** ISO timestamp; defaults to now at serialization time when omitted. */
+  /** ISO timestamp of detection. Deterministic output requires this be set (or passed via options). */
   detectedAt?: string;
+}
+
+/**
+ * Runtime schema for a finding loaded from untrusted JSON (the emit CLI). Serializing unvalidated
+ * input can silently produce malformed SARIF (e.g. `undefined on undefined`), so callers MUST parse
+ * before serializing. Kept structurally in sync with CrucibleFinding above.
+ */
+export const CrucibleFindingSchema = z.object({
+  challengeId: z.string().min(1),
+  ruleId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  severity: z.enum(["critical", "high", "medium", "low"]),
+  cwe: z.number().int().nonnegative(),
+  target: z.string().min(1),
+  sourceFile: z.string().min(1).optional(),
+  sourceLine: z.number().int().positive().optional(),
+  confirmed: z.boolean(),
+  evidence: z.string().min(1),
+  remediation: z.string().min(1),
+  detectedAt: z.string().min(1).optional(),
+});
+
+/** Validate untrusted input into a CrucibleFinding, throwing a ZodError on any malformed field. */
+export function parseFinding(input: unknown): CrucibleFinding {
+  return CrucibleFindingSchema.parse(input);
 }
 
 /** GitHub uses properties["security-severity"] (a CVSS-like 0–10 string) to bucket alerts. */
@@ -57,12 +96,18 @@ const DRIVER_NAME = "The Crucible";
 const INFORMATION_URI = "https://github.com/Rigur-Calypso/Crucible";
 const DRIVER_VERSION = "0.1.0";
 
+/** Options for serialization. `now` supplies a timestamp only when the finding has no detectedAt. */
+export interface ToSarifOptions {
+  now?: string;
+}
+
 /**
  * Serialize one finding to a SARIF 2.1.0 log (a single run with a single rule + result).
- * The returned value is a plain JSON-serializable object.
+ * Pure and deterministic: identical inputs produce identical bytes (no clock read). The returned
+ * value is a plain JSON-serializable object.
  */
-export function toSarif(finding: CrucibleFinding): Record<string, unknown> {
-  const detectedAt = finding.detectedAt ?? new Date().toISOString();
+export function toSarif(finding: CrucibleFinding, options: ToSarifOptions = {}): Record<string, unknown> {
+  const detectedAt = finding.detectedAt ?? options.now; // may be undefined → omitted, never invented
   const cweTag = `external/cwe/cwe-${finding.cwe}`;
   const level = sarifLevel(finding.severity);
 
@@ -80,6 +125,28 @@ export function toSarif(finding: CrucibleFinding): Record<string, unknown> {
     },
   };
 
+  // Anchor to a repo-relative source file when known (GitHub can ingest it); otherwise fall back to
+  // a logicalLocation only. An http endpoint is NEVER used as a physicalLocation.uri — GitHub
+  // relativizes physical locations against the checkout and would reject a non-file scheme. The
+  // endpoint always travels in the message + properties instead.
+  const logicalLocations = [{ fullyQualifiedName: finding.challengeId, kind: "resource" }];
+  const location: Record<string, unknown> =
+    finding.sourceFile !== undefined
+      ? {
+          physicalLocation: {
+            artifactLocation: { uri: finding.sourceFile },
+            ...(finding.sourceLine !== undefined ? { region: { startLine: finding.sourceLine } } : {}),
+          },
+          logicalLocations,
+        }
+      : { logicalLocations };
+
+  // GitHub code scanning de-duplicates on partialFingerprints.primaryLocationLineHash. Provide a
+  // stable hash derived from the finding's identity so re-emits collapse to one alert; keep the
+  // human-readable crucible/* keys too (valid SARIF; used by tools that read custom fingerprints).
+  const identity = [finding.ruleId, finding.challengeId, finding.sourceFile ?? finding.target, finding.sourceLine ?? ""].join("|");
+  const primaryLocationLineHash = createHash("sha256").update(identity).digest("hex");
+
   const result = {
     ruleId: finding.ruleId,
     ruleIndex: 0,
@@ -87,26 +154,17 @@ export function toSarif(finding: CrucibleFinding): Record<string, unknown> {
     message: {
       text: `${finding.title} on ${finding.target}. ${finding.evidence}`,
     },
-    locations: [
-      {
-        physicalLocation: {
-          // A URL is a valid artifactLocation.uri; annotates the endpoint the finding concerns.
-          artifactLocation: { uri: finding.target },
-        },
-        logicalLocations: [
-          { fullyQualifiedName: finding.challengeId, kind: "resource" },
-        ],
-      },
-    ],
-    // Stable identity so re-emitting the same finding de-duplicates in downstream tools.
+    locations: [location],
     partialFingerprints: {
+      primaryLocationLineHash,
       "crucible/challenge": finding.challengeId,
       "crucible/rule": finding.ruleId,
     },
     properties: {
       confirmed: finding.confirmed,
       challengeId: finding.challengeId,
-      detectedAt,
+      endpoint: finding.target,
+      ...(detectedAt !== undefined ? { detectedAt } : {}),
       evidence: finding.evidence,
     },
   };
@@ -147,6 +205,11 @@ export const WEB01_FINDING: CrucibleFinding = {
   severity: "high",
   cwe: 89,
   target: "http://web-01:5000/login",
+  // Root-cause code, so GitHub anchors the alert to a real file (the endpoint stays in message/props).
+  sourceFile: "arena/web-01/app.py",
+  sourceLine: 50,
+  // Fixed timestamp keeps the default emitter output byte-for-byte deterministic (see emit.ts).
+  detectedAt: "2026-08-28T00:00:00.000Z",
   confirmed: true,
   evidence:
     "Payload `username=admin'--&password=x` to POST /login returned HTTP 200 with the protected " +

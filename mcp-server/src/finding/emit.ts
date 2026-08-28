@@ -1,28 +1,35 @@
 /**
  * emit.ts — CLI that serializes a Crucible finding to SARIF 2.1.0 on stdout.
  *
- *   npm run emit:finding                 # emits the reference web-01 finding
- *   npm run emit:finding -- finding.json # emits a finding you provide (same shape as CrucibleFinding)
+ *   npm run emit:finding                 # emits the reference web-01 finding (deterministic bytes)
+ *   npm run emit:finding -- finding.json # emits a finding you provide (validated; same shape as CrucibleFinding)
  *   npm run emit:finding -- > web-01.sarif.json
  *
- * Deterministic and offline: it does not touch the arena. Use it after a Security Case to hand a
- * judge / pipeline the finding in the same format a human static-analysis tool would produce.
+ * Offline: it does not touch the arena. A provided file is VALIDATED before serialization — invalid
+ * input fails with a nonzero exit rather than emitting malformed SARIF. The reference finding carries
+ * a fixed timestamp so its output is byte-for-byte deterministic; a provided finding without its own
+ * `detectedAt` is stamped with the current time here (at the CLI boundary, keeping the serializer pure).
  */
 
 import { readFileSync } from "node:fs";
-import { toSarif, WEB01_FINDING, type CrucibleFinding } from "./sarif.ts";
+import { toSarif, WEB01_FINDING, parseFinding, type CrucibleFinding } from "./sarif.ts";
 
-function loadFinding(argv: string[]): CrucibleFinding {
+interface Loaded {
+  finding: CrucibleFinding;
+  now?: string; // supplied only for provided findings lacking their own detectedAt
+}
+
+function loadFinding(argv: string[]): Loaded {
   const file = argv[2];
-  if (!file) return WEB01_FINDING;
-  const parsed = JSON.parse(readFileSync(file, "utf8")) as CrucibleFinding;
-  return parsed;
+  if (!file) return { finding: WEB01_FINDING }; // has a fixed detectedAt → deterministic
+  const finding = parseFinding(JSON.parse(readFileSync(file, "utf8")));
+  return { finding, now: new Date().toISOString() };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {
-    const finding = loadFinding(process.argv);
-    process.stdout.write(JSON.stringify(toSarif(finding), null, 2) + "\n");
+    const { finding, now } = loadFinding(process.argv);
+    process.stdout.write(JSON.stringify(toSarif(finding, { now }), null, 2) + "\n");
   } catch (err) {
     process.stderr.write(`emit-finding failed: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);

@@ -19,11 +19,15 @@ npm --prefix mcp-server run emit:finding -- > web-01.sarif.json
 npm --prefix mcp-server run emit:finding -- my-finding.json
 ```
 
-The emitter is a pure serializer ([`src/finding/sarif.ts`](../mcp-server/src/finding/sarif.ts)); it
-does **not** decide whether a vulnerability exists — it serializes a finding the agent already
+The emitter is a pure, **deterministic** serializer ([`src/finding/sarif.ts`](../mcp-server/src/finding/sarif.ts));
+it does **not** decide whether a vulnerability exists — it serializes a finding the agent already
 validated end-to-end. Output includes the rule (CWE-tagged, `security-severity` for GitHub
-bucketing), the result (`level: error` for high severity), the target location, and the captured
-evidence. Covered by [`test/sarif.test.ts`](../mcp-server/test/sarif.test.ts).
+bucketing), the result (`level: error` for high severity), a **repo-relative source location**
+(e.g. `arena/web-01/app.py:50`) that GitHub code scanning can anchor to — with the live endpoint in
+the message/properties, never as a physical-location URI — a supported `primaryLocationLineHash`
+fingerprint for de-duplication, and the captured evidence. A file provided to the CLI is validated
+(zod) before serialization, so malformed input fails loudly instead of producing junk SARIF. Covered
+by [`test/sarif.test.ts`](../mcp-server/test/sarif.test.ts).
 
 ## 2. Gated-action audit log
 

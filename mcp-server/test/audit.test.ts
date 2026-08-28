@@ -94,3 +94,22 @@ test("read-only tools do not emit audit events (only the gated tools are logged)
   await client.close();
   assert.equal(events.length, 0);
 });
+
+test("a THROWING audit sink never breaks the gated tool call (result still returned)", async () => {
+  const client = await connectedClient({
+    audit: () => {
+      throw new Error("sink exploded");
+    },
+    fetcher: async () => ({ status: 200, body: '{"ok":true,"flag":"crucible{sqli_auth_bypass_web01}"}', truncated: false }),
+  });
+  // connect (blocked) and http_request (executed) must both return their result despite the sink throwing.
+  const blocked = await client.callTool({ name: "connect", arguments: { host: "8.8.8.8", port: 5000 } });
+  assert.equal(blocked.isError, true); // policy block is the real result, not a sink error
+  const exploit = await client.callTool({
+    name: "http_request",
+    arguments: { host: "10.42.0.5", port: 5000, method: "POST", path: "/login", body: "username=admin'--&password=x" },
+  });
+  assert.notEqual(exploit.isError, true);
+  assert.match((exploit as any).content?.[0]?.text ?? "", /crucible\{sqli_auth_bypass_web01\}/);
+  await client.close();
+});

@@ -66,3 +66,20 @@ export function createAuditSinkFromEnv(env: NodeJS.ProcessEnv = process.env): Au
   const path = env.CRUCIBLE_AUDIT_LOG;
   return path ? appendJsonlSink(path) : noopSink;
 }
+
+/**
+ * Wrap ANY sink so it can never throw into the caller. The audit log is evidence, not a dependency
+ * of the action — a gated tool call must return its real result even if the sink (including an
+ * injected one) fails. Errors are reported to stderr and swallowed.
+ */
+export function nonThrowing(sink: AuditSink): AuditSink {
+  return (event: AuditEvent) => {
+    try {
+      sink(event);
+    } catch (err) {
+      process.stderr.write(
+        `crucible audit: sink threw (ignored): ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+  };
+}

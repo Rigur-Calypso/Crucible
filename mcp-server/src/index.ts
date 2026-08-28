@@ -20,7 +20,7 @@ import { readChallengeFile } from "./tools/fetchFile.ts";
 import { submitFlag } from "./tools/submitFlag.ts";
 import { connect, type Connector } from "./tools/connect.ts";
 import { httpRequest, type HttpFetcher } from "./tools/httpRequest.ts";
-import { createAuditSinkFromEnv, type AuditSink } from "./audit/auditLog.ts";
+import { createAuditSinkFromEnv, nonThrowing, type AuditSink } from "./audit/auditLog.ts";
 
 /** Pure tool functions, exported for reuse/tests independent of the MCP transport. */
 export const tools = { listChallenges, getChallenge, readChallengeFile, submitFlag, connect, httpRequest };
@@ -62,7 +62,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
   // The audit sink records every invocation of the two approval-gated tools + the Layer-2 policy
   // decision that reached this server. It never records the human approve/deny (that is TrueForge's,
   // upstream of here). Failures in the sink must never break a tool call.
-  const audit = options.audit ?? createAuditSinkFromEnv();
+  const audit = nonThrowing(options.audit ?? createAuditSinkFromEnv());
 
   server.registerTool(
     "list_challenges",

@@ -20,6 +20,7 @@ import { readChallengeFile } from "./tools/fetchFile.ts";
 import { submitFlag } from "./tools/submitFlag.ts";
 import { connect, type Connector } from "./tools/connect.ts";
 import { httpRequest, type HttpFetcher } from "./tools/httpRequest.ts";
+import { createAuditSinkFromEnv, type AuditSink } from "./audit/auditLog.ts";
 
 /** Pure tool functions, exported for reuse/tests independent of the MCP transport. */
 export const tools = { listChallenges, getChallenge, readChallengeFile, submitFlag, connect, httpRequest };
@@ -48,10 +49,20 @@ export interface CreateServerOptions {
   connector?: Connector;
   /** Override the HTTP fetcher used by `http_request` (tests inject a deterministic one). */
   fetcher?: HttpFetcher;
+  /**
+   * Sink for the gated-action audit log. Defaults to the env-configured sink
+   * (file-backed when CRUCIBLE_AUDIT_LOG is set, otherwise a no-op). Tests inject an in-memory
+   * sink to assert what the boundary recorded.
+   */
+  audit?: AuditSink;
 }
 
 export function createServer(options: CreateServerOptions = {}): McpServer {
   const server = new McpServer({ name: "crucible-mcp-server", version: "0.1.0" });
+  // The audit sink records every invocation of the two approval-gated tools + the Layer-2 policy
+  // decision that reached this server. It never records the human approve/deny (that is TrueForge's,
+  // upstream of here). Failures in the sink must never break a tool call.
+  const audit = options.audit ?? createAuditSinkFromEnv();
 
   server.registerTool(
     "list_challenges",
@@ -141,6 +152,16 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       const result = options.connector
         ? await connect({ host, port }, options.connector)
         : await connect({ host, port });
+      audit({
+        ts: new Date().toISOString(),
+        tool: "connect",
+        host,
+        port,
+        decision: result.blocked ? "blocked" : "allowed",
+        outcome: result.blocked ? "blocked" : result.connected ? "executed" : "failed",
+        target: result.target,
+        reason: result.reason,
+      });
       return jsonResult(result, result.ok === false);
     },
   );
@@ -174,6 +195,18 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
       const result = options.fetcher
         ? await httpRequest(input, options.fetcher)
         : await httpRequest(input);
+      audit({
+        ts: new Date().toISOString(),
+        tool: "http_request",
+        host,
+        port,
+        method: (method ?? "GET").toUpperCase(),
+        path: path ?? "/",
+        decision: result.blocked ? "blocked" : "allowed",
+        outcome: result.blocked ? "blocked" : result.ok ? "executed" : "failed",
+        target: result.target,
+        reason: result.reason,
+      });
       return jsonResult(result, result.ok === false);
     },
   );

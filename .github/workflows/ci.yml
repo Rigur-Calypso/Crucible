@@ -1,0 +1,45 @@
+# CI — typecheck + the MCP server's fail-closed unit/integration suite on every PR and push to
+# main. This is the automated counterpart to the human + Qodo review on each PR: it keeps the
+# security-critical policy (Layer 2), the tool wiring, and the HTTP endpoint honest over time.
+#
+# Scope note: this runs the fast, hermetic checks (no Docker). The network-level Layer 1 proof
+# lives in arena/verify-arena.sh, which needs a Docker daemon and is run before a demo, not here.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref so pushes don't pile up.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  mcp-server:
+    name: mcp-server (typecheck + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (fail-closed policy, tools, HTTP endpoint)
+        run: npm test

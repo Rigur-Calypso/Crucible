@@ -1,0 +1,11 @@
+{
+  "id": "crypto-01",
+  "title": "XOR is not encryption",
+  "category": "crypto",
+  "points": 75,
+  "live": false,
+  "description": "Static-analysis challenge: recover a single-byte-XOR flag from cipher.bin. No live target, no approval gate.",
+  "artifacts": ["brief.txt", "cipher.bin"],
+  "reference_impl": "arena/crypto-01/challenge.py",
+  "served_from": "mcp-server/challenge-files/crypto-01/"
+}

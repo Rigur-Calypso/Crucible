@@ -21,8 +21,19 @@ unknown key byte (`0x00`–`0xFF`). The ciphertext ships as
    agent never decides correctness itself.
 
 This is proven end-to-end in [`test/crypto01.test.ts`](../mcp-server/test/crypto01.test.ts), which
-runs exactly that path (real `fetch_file` → brute-force → `submit_flag`) and asserts a single
-well-formed key recovers a flag that validates.
+runs exactly that path **through the real MCP tool calls** (a linked in-memory client/server pair
+calling `fetch_file` and `submit_flag`, so registration, schemas, wiring, and serialization are all
+covered) and asserts a single well-formed key recovers a flag that validates server-side.
+
+## Python reference implementation (provenance)
+
+[`arena/crypto-01/challenge.py`](../arena/crypto-01/challenge.py) is the Python primary entrypoint for
+crypto-01 (alongside web-01's Flask app): it **generates** the ciphertext (`generate`), **solves** it
+(`solve`), and **verifies** the served artifact recovers exactly the flag (`verify`). It lives under
+`arena/` — deliberately **not** under `mcp-server/challenge-files/` — so it is never served by
+`fetch_file`: the agent receives only `cipher.bin`, never the solver or the plaintext. Running
+`python arena/crypto-01/challenge.py generate` reproduces the committed `cipher.bin` byte-for-byte,
+so the artifact's provenance is reproducible.
 
 ## Why it is safe and why it earns its place
 

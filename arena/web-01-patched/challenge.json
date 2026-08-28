@@ -1,0 +1,8 @@
+{
+  "id": "web-01-patched",
+  "title": "Login Bypass (patched control)",
+  "category": "web",
+  "points": 0,
+  "description": "Patched twin of web-01: the SQLi auth bypass is fixed. Not exploitable.",
+  "connection": { "host": "web-01-patched", "port": 5000, "path": "/login" }
+}

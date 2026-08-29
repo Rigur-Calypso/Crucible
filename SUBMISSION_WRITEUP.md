@@ -61,7 +61,7 @@ Defense in depth, both layers tested:
   **every** resolved address against the arena subnet, **pins** the IP (anti-DNS-rebinding), and
   opens a real socket only to an approved arena target — rejecting public IPs, loopback, private/
   link-local ranges, IPv6, malformed inputs, and alternate encodings. Fail-closed, with a 13-case
-  matrix plus in-process MCP integration tests (**40 tests total**); `http_request` reuses the same allowlist.
+  matrix plus in-process MCP integration tests (**58 tests total**); `http_request` reuses the same allowlist.
 
 The MCP endpoint itself is hardened: **loopback-only** publish, **bearer-token auth** (via the
 connector's header auth), **DNS-rebinding Host validation**, and **bounded request bodies**.

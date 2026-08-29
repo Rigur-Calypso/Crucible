@@ -9,10 +9,10 @@ asks a human to authorize** the one action that touches the live target — exec
 flag as evidence, and produces a **security finding**.*
 
 [![CI](https://github.com/Rigur-Calypso/Crucible/actions/workflows/ci.yml/badge.svg)](https://github.com/Rigur-Calypso/Crucible/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-40%2F40-brightgreen)
+![tests](https://img.shields.io/badge/tests-58%2F58-brightgreen)
 ![arena checks](https://img.shields.io/badge/arena%20checks-9%2F9-brightgreen)
 ![security](https://img.shields.io/badge/network%20boundary-fail--closed-critical)
-![Qodo](https://img.shields.io/badge/Qodo-10%20reviewed%20PRs-blue)
+![Qodo](https://img.shields.io/badge/Qodo-15%20reviewed%20PRs-blue)
 ![TrueForge](https://img.shields.io/badge/TrueForge-load--bearing-8A2BE2)
 ![license](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![targets](https://img.shields.io/badge/targets-self--owned%20only-lightgrey)
@@ -33,10 +33,10 @@ dangerous action stays inside **enforceable technical and human boundaries**:
 - 🛑 **Human-gated** — TrueForge **pauses** before the one action that touches the live target
   (`connect` / `http_request`) and blocks until a person clicks **Allow**. *"License to Hack."*
 - 🔒 **Contained in code, fails closed** — a two-layer network boundary (arena-only Docker network +
-  an in-code allowlist) that no prompt can talk its way around. **9/9 arena checks, 40/40 tests.**
+  an in-code allowlist) that no prompt can talk its way around. **9/9 arena checks, 58/58 tests.**
 - 🎯 **Real result** — it lands the SQL-injection auth bypass on `web-01`, captures
   `crucible{…}`, validates it server-side, and emits a structured **security finding** — not "flag found."
-- ✅ **Every change Qodo-reviewed** across 10 PRs; direct pushes to `main` are never used.
+- ✅ **Every change Qodo-reviewed** across 15 PRs; direct pushes to `main` are never used.
 
 > **Remove TrueForge and the architecture collapses:** the harness *is* the agent loop, the MCP tool
 > routing, and — critically — the human-approval gate. (Its sandbox-as-tool is available too; we keep
@@ -106,8 +106,8 @@ flowchart LR
 |---|---|
 | **Potential impact** | Autonomous vulnerability triage/validation is real, valuable security work (bug-bounty triage, pre-prod validation, security education) — not a toy. |
 | **Creativity / originality** | A safety-first *security-validation agent* — a distinctive, high-signal domain, not another chatbot/dashboard. |
-| **Technical excellence** | Custom MCP server (6 zod-typed tools), Streamable-HTTP transport, defense-in-depth network containment with anti-DNS-rebinding, server-side flag validation — **40 tests + 9 arena checks**. |
-| **Use of sponsor tools** | **TrueForge is load-bearing** — MCP routing and the human-approval gate (sandbox-as-tool available, off by default for containment); remove it and the safety model collapses. **Qodo** reviewed all 10 PRs. |
+| **Technical excellence** | Custom MCP server (6 zod-typed tools), Streamable-HTTP transport, defense-in-depth network containment with anti-DNS-rebinding, server-side flag validation — **58 tests + 9 arena checks**. |
+| **Use of sponsor tools** | **TrueForge is load-bearing** — MCP routing and the human-approval gate (sandbox-as-tool available, off by default for containment); remove it and the safety model collapses. **Qodo** reviewed all 15 PRs. |
 | **Control & safety** | The whole premise is safety-critical (an LLM runs exploit code). The approval gate + code-enforced, fail-closed boundary are **real, tested controls** — not disclaimers. |
 | **Presentation** | The approval pause, a live controlled exploit, and a network-boundary **rejection** are inherently dramatic and on-theme with the "License to act / 007" framing. |
 
@@ -184,7 +184,7 @@ The MCP server comes up **with the arena** (the `mcp` service) at `http://127.0.
 cd mcp-server
 npm install
 npm run typecheck     # tsc strict + noUncheckedIndexedAccess
-npm test              # 40 tests: fail-closed policy + in-process MCP + HTTP transport + tools
+npm test              # 58 tests: fail-closed policy + in-process MCP + HTTP transport + tools
 npm run start:http    # serve over Streamable HTTP (or `npm start` for stdio)
 ```
 
@@ -213,7 +213,7 @@ Expected arc: recon → hypothesis → **approval pause on `http_request`** → 
 
 ## 🧪 Testing
 ```
-# MCP server: fail-closed network policy, in-process MCP, HTTP transport, tools (40 tests)
+# MCP server: fail-closed network policy, in-process MCP, HTTP transport, tools (58 tests)
 cd mcp-server && npm run typecheck && npm test
 
 # Arena + Layer-1 containment + the http_request tool path (9 checks) — needs Docker
@@ -221,7 +221,7 @@ bash arena/verify-arena.sh
 ```
 The security boundary is not "done" until the fail-closed matrix in
 [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md) §6 passes and both layers are proven. Current
-status: **40/40 unit/integration tests, 9/9 arena checks.**
+status: **58/58 unit/integration tests, 9/9 arena checks.**
 
 ## Qodo Code Review Evidence
 Every substantive change in this repo goes through a GitHub pull request reviewed by Qodo before
@@ -269,8 +269,10 @@ can be explained during judging. Design and code were produced during the hackat
 - **Agent sandbox is off by default.** Standalone TrueForge can't constrain sandbox egress, so we
   route all target interaction through the allowlisted, approval-gated tools instead (see
   `docs/SECURITY_MODEL.md` §3a). Enabling the sandbox is opt-in, arena-only.
-- **One flagship challenge.** `web-01` is fully built and polished; secondary challenges
-  (`crypto-01`, `forensics-01`, `pwn-01`) are intentionally out of scope for reliability.
+- **Focused, honestly-scoped arena.** `web-01` (live SQLi) is the polished flagship, alongside a
+  patched control twin (`web-01-patched`) for differential validation and a non-live `crypto-01`
+  (single-byte-XOR, solved via `fetch_file` + analysis). `forensics-01` / `pwn-01` remain
+  intentionally out of scope for reliability.
 - **Free-tier model variance.** `gemini-3.5-flash-lite` occasionally returns a transient Google 503;
   a second take succeeds (the demo runbook accounts for this).
 
@@ -280,7 +282,10 @@ can be explained during judging. Design and code were produced during the hackat
 | [`PRD.md`](PRD.md) · [`PROJECT_DECISIONS.md`](PROJECT_DECISIONS.md) | Requirements & authoritative decisions |
 | [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md) | Threat model, two-layer boundary, fail-closed matrix |
 | [`docs/TRUEFORGE_INTEGRATION.md`](docs/TRUEFORGE_INTEGRATION.md) · [`docs/TRUEFORGE_SETUP.md`](docs/TRUEFORGE_SETUP.md) | How the harness is used + how to run it |
+| [`docs/DIFFERENTIAL.md`](docs/DIFFERENTIAL.md) | Patched-twin differential: validator, not flag-matcher (`verify-differential.sh`) |
+| [`docs/EVIDENCE.md`](docs/EVIDENCE.md) | SARIF 2.1.0 finding emitter + gated-action audit log |
+| [`docs/CHALLENGE_CRYPTO01.md`](docs/CHALLENGE_CRYPTO01.md) | The non-live `crypto-01` challenge |
 | [`docs/DEMO_SHOTLIST.md`](docs/DEMO_SHOTLIST.md) · [`DEMO_PLAN.md`](DEMO_PLAN.md) | ~3-min demo runbook |
-| [`arena/`](arena) | Self-owned vulnerable targets + `verify-arena.sh` |
+| [`arena/`](arena) | Self-owned vulnerable targets + `verify-arena.sh` · `verify-differential.sh` |
 | [`mcp-server/`](mcp-server) | The MCP server (tools, network policy, tests) |
 | [`scripts/trueforge-setup.mjs`](scripts/trueforge-setup.mjs) | One-command connector + model + agent wiring |

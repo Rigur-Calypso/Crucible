@@ -3,6 +3,9 @@
 **A safety-first autonomous security-validation agent, built on TrueForge.**
 The Agent Harness Hackathon (WeMakeDevs × TrueFoundry × Qodo × OpenAI) · Track: Best Use of TrueForge.
 
+**Repository:** https://github.com/Rigur-Calypso/Crucible
+**Demo video:** https://youtu.be/Xvnvjd8yFqM
+
 ---
 
 ## What it does

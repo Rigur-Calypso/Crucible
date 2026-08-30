@@ -1,5 +1,7 @@
 # Demo Shot-List — The Crucible (~3 min)
 
+**Recorded take: https://youtu.be/Xvnvjd8yFqM**
+
 Operational companion to `DEMO_PLAN.md`: exact pre-flight, clicks, prompts, and what must be on
 screen per beat, tailored to the TrueForge chat UI + the `crucible-agent` (Gemini). **Everything
 shown is real.** Record at 1440p+, hide the terminal that holds `CRUCIBLE_MCP_TOKEN` / the API key.

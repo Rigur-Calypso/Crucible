@@ -19,6 +19,8 @@ flag as evidence, and produces a **security finding**.*
 
 **The Agent Harness Hackathon** · WeMakeDevs × TrueFoundry × Qodo × OpenAI · Track: **Best Use of TrueForge**
 
+**▶ [Watch the 3-minute demo](https://youtu.be/Xvnvjd8yFqM)**
+
 </div>
 
 ---
@@ -41,6 +43,16 @@ dangerous action stays inside **enforceable technical and human boundaries**:
 > **Remove TrueForge and the architecture collapses:** the harness *is* the agent loop, the MCP tool
 > routing, and — critically — the human-approval gate. (Its sandbox-as-tool is available too; we keep
 > it off by default — see the security model — and route every live action through allowlisted tools.)
+
+---
+
+## 🎬 Demo
+
+**▶ [Watch the 3-minute demo](https://youtu.be/Xvnvjd8yFqM)** — one real Security Case end to end:
+the agent's autonomous recon and PoC, the TrueForge **approval pause** before the live-target action,
+the operator granting the "License to Hack," the **controlled exploit** landing on `web-01` and
+capturing the flag, and the **network boundary rejecting** an out-of-arena destination — the safety
+control filmed, not just claimed.
 
 ---
 

@@ -551,3 +551,31 @@ Flash-lite sometimes lingers on the sandbox dry-run and doesn't proceed to the e
 
 ### Current status
 Demo profile built + safety-verified. Default stays sandbox-off. On `feature/readme-quickstart-final`.
+
+---
+
+## 2026-08-30 — Demo video recorded + submission finalized
+
+### Objective
+Close out the submission: record the ~3-minute demo and point every submission artifact at it.
+
+### Actions
+- Recorded the demo take and published it: https://youtu.be/Xvnvjd8yFqM. It shows one real
+  Security Case end to end — autonomous recon + PoC, the TrueForge approval pause, the operator's
+  "License to Hack," the controlled exploit landing on `web-01` and capturing the flag, and the
+  network boundary rejecting an out-of-arena destination.
+- README: added a hero **▶ Watch the 3-minute demo** link and a `## 🎬 Demo` section (both linking
+  the same URL, one line on what it shows).
+- `SUBMISSION_WRITEUP.md`: added repository + `Demo video:` links at the top (this file feeds the
+  submission form).
+- `SUBMISSION_CHECKLIST.md`: ticked every now-true box (public repo, README, Qodo evidence + PR
+  trail, LICENSE, AI disclosure, tests/boundary, demo video). Left only the blog-post line (not
+  entering that prize) and the optional reliability-gated bonus unchecked.
+- `docs/DEMO_SHOTLIST.md`: added `Recorded take:` pointer to the published video.
+- Shipped as a single docs PR ("docs: add demo video + finalize submission"), Qodo-reviewed like
+  every other change — no direct pushes to `main`.
+
+### Current status
+Submission complete. All code, tests, safety boundary, Qodo review trail, and the demo video are in
+place; remaining steps are external (paste links into the hackathon submission form; confirm Qodo
+comments are visible logged-out).
